@@ -1,5 +1,4 @@
 COMPILER = g++
-# FLAGS = -std=c++14 -g -Wall -Werror -Wextra -Wpedantic
 FLAGS = -std=c++14 -O3 -Wall -Werror -Wextra -Wpedantic
 
 SO_DEPS = $(shell pkg-config --libs --cflags libSimpleAmqpClient msgpack librabbitmq opencv theoradec theoraenc)
@@ -10,10 +9,13 @@ SERVICE = robot-controller
 VERSION = 1
 LOCAL_REGISTRY = git.is:5000
 
-all: $(SERVICE)
+all: $(SERVICE) test
 
 clean:
 	rm -f $(SERVICE) 
+
+test: test.cpp
+	$(COMPILER) $^ -o $@ $(FLAGS) $(SO_DEPS) 
 
 $(SERVICE): $(SERVICE).cpp
 	$(COMPILER) $^ -o $@ $(FLAGS) $(SO_DEPS) 

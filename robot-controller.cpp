@@ -1,5 +1,12 @@
 #include "msgs/robot-controller.hpp"
+#include "fence.hpp"
 #include "robot-parameters.hpp"
+#include "task.hpp"
+
+#include <is/is.hpp>
+#include <is/msgs/common.hpp>
+#include <is/msgs/geometry.hpp>
+#include <is/msgs/robot.hpp>
 
 #include <algorithm>
 #include <armadillo>
@@ -9,10 +16,6 @@
 #include <cmath>
 #include <condition_variable>
 #include <iostream>
-#include <is/is.hpp>
-#include <is/msgs/common.hpp>
-#include <is/msgs/geometry.hpp>
-#include <is/msgs/robot.hpp>
 #include <map>
 #include <mutex>
 #include <thread>
@@ -37,6 +40,7 @@ arma::vec mean_pose(I first, I last) {
     return total;
   };
   arma::mat poses = std::accumulate(first, last, arma::mat(0, 0, arma::fill::zeros), join_poses);
+  is::log::info("{} / {}", poses.n_rows, std::distance(first, last));
 
   if (!poses.empty()) {
     poses = arma::mean(poses);
@@ -46,79 +50,38 @@ arma::vec mean_pose(I first, I last) {
   return arma::vectorise(poses);
 }
 
+template <typename I>
+bool inside_window(I first, I last, int64_t timestamp) {
+  return std::all_of(first, last,
+                     [&](auto msg) { return static_cast<int64_t>(msg.second->Message()->Timestamp()) > timestamp; });
+}
+
 void send_speed(is::ServiceClient& client, std::string const& robot, arma::vec const& speed) {
   Speed command{speed(0), speed(1)};
   auto id = client.request(robot + ".set_speed", is::msgpack(command));
   client.receive_for(milliseconds(1), id, is::policy::discard_others);
 }
 
-arma::vec eval_speed(robot::Parameters const& parameters, arma::vec const& current_pose, arma::vec const& desired_pose,
-                     arma::vec const& trajectory_speed, double const& stop_distance) {
-  vec error = desired_pose.subvec(0, 1) - current_pose.subvec(0, 1);
-  if (arma::norm(error) < stop_distance)
-    return arma::vec({0.0, 0.0});
-  auto heading = current_pose(2);
-  auto a = parameters.center_offset;
-  auto L = parameters.L;
-  auto K = parameters.K;
-  mat invA = {{cos(heading), sin(heading)}, {-(1.0 / a) * sin(heading), (1.0 / a) * cos(heading)}};
-  vec C = trajectory_speed + L % tanh((K / L) % error);
-  return invA * C;
-}
-
-namespace fence {
-
-arma::mat limit_pose(arma::vec const& current_pose, arma::vec const& desired_pose, arma::vec const& fence) {
-  auto x = current_pose(0);
-  auto y = current_pose(1);
-  auto xd = desired_pose(0);
-  auto yd = desired_pose(1);
-  auto x_min = fence(0);
-  auto x_max = fence(1);
-  auto y_min = fence(2);
-  auto y_max = fence(3);
-  auto a = (yd - y) / (xd - x);
-  auto b = 1 / a;
-  auto x_out = xd > x_max || xd < x_min;
-  auto y_out = yd > y_max || yd < y_min;
-  if (x_out || y_out) {
-    is::log::warn("Desired pose out of bounds. Limiting it.");
+void publish_pose(is::Connection& is, std::string const& name, arma::vec const& current_pose) {
+  optional<Pose> visual_pose;
+  if (!current_pose.empty()) {
+    Pose pose;
+    pose.position.x = current_pose(0);
+    pose.position.y = current_pose(1);
+    pose.heading = current_pose(2);
+    visual_pose = pose;
+  } else {
+    visual_pose = none;
   }
-  auto xd_b = x_out ? std::min(std::max(xd, x_min), x_max) : xd;
-  auto yd_b = y_out ? std::min(std::max(yd, y_min), y_max) : yd;
-  xd_b = !x_out && y_out ? b * (yd_b - y) + x : xd_b;
-  yd_b = x_out && !y_out ? a * (xd_b - x) + y : yd_b;
-  arma::mat new_desired_pose(desired_pose);
-  new_desired_pose(0) = xd_b;
-  new_desired_pose(1) = yd_b;
-  return new_desired_pose;
+  is.publish(name + ".pose", is::msgpack(visual_pose));
 }
-
-arma::mat limit_speed(arma::vec const& current_pose, arma::vec const& speed, arma::vec const& fence) {
-  auto x = current_pose(0);
-  auto y = current_pose(1);
-  auto x_min = fence(0);
-  auto x_max = fence(1);
-  auto y_min = fence(2);
-  auto y_max = fence(3);
-  auto x_out = x > x_max || x < x_min;
-  auto y_out = y > y_max || y < y_min;
-  if (x_out || y_out) {
-    is::log::warn("Robot leaving critical area. Forcing stop.");
-    return arma::mat(2, 1, arma::fill::zeros);
-  }
-  return speed;
-}
-
-}  // ::fence
 
 namespace is {
-template <typename Time>
-auto consume_until(is::Connection& is, is::QueueInfo const& tag, Time const& deadline) {
-  auto timeout = deadline - high_resolution_clock::now();
+auto consume_until(is::Connection& is, is::QueueInfo const& tag, int64_t deadline) {
+  auto timeout = deadline - is::time_since_epoch_ns();
   Envelope::ptr_t envelope;
-  if (duration_cast<milliseconds>(timeout).count() >= 1.0) {
-    envelope = is.consume_for(tag, timeout);
+  if (timeout >= 1e6) {  // timeout > 1ms
+    envelope = is.consume_for(tag, milliseconds(static_cast<int64_t>(timeout / 1e6)));
   }
   return envelope;
 }
@@ -131,9 +94,6 @@ int main(int argc, char* argv[]) {
   std::string parameters_file;
   double rate;
 
-  double desired_x;
-  double desired_y;
-
   po::options_description description("Allowed options");
   auto&& options = description.add_options();
   options("help,", "show available options");
@@ -144,9 +104,6 @@ int main(int argc, char* argv[]) {
   options("parameters,p", po::value<std::string>(&parameters_file)->default_value("parameters.yaml"),
           "yaml file with robot parameters");
   options("rate,R", po::value<double>(&rate)->default_value(5.0), "sampling rate");
-
-  options("desired_x,x", po::value<double>(&desired_x)->default_value(0.0), "desired x pose");
-  options("desired_y,y", po::value<double>(&desired_y)->default_value(0.0), "desired y pose");
 
   po::variables_map vm;
   po::store(po::parse_command_line(argc, argv, description), vm);
@@ -159,107 +116,109 @@ int main(int argc, char* argv[]) {
 
   robot::Parameters parameters(parameters_file);
 
-  Trajectory trajectory;
   std::mutex mtx;
-  std::condition_variable new_task;
-  bool trajectory_received = false;
+  std::function<arma::vec(arma::vec)> task = task::none();
 
   auto is = is::connect(uri);
   auto client = is::make_client(is);
 
   std::string name = "robot-controller" + robot.substr(robot.find_last_of('.'));
-  is::log::info("Starting service {}", name);
-  // clang-format off
-  auto thread = is::advertise(uri, name, {
-    {
-      "do_trajectory", [&](is::Request request) -> is::Reply {
-        mtx.lock();
-        trajectory = is::msgpack<Trajectory>(request);
-        trajectory_received = true;
-        mtx.unlock();
-        is::log::info("New trajectory received with {} points", trajectory.positions.size());
-        new_task.notify_one();
-        return is::msgpack(status::ok);
-      }
+  auto provider = is::ServiceProvider(name, is::make_channel(uri));
+
+  provider.expose("do-task", [&](is::Request request) -> is::Reply {
+    auto robot_task = is::msgpack<RobotTask>(request);
+    auto positions = robot_task.positions.size();
+    auto speeds = robot_task.speeds.size();
+
+    std::function<arma::vec(arma::vec)> new_task;
+    if (positions == 1 && speeds == 0) {
+      new_task = task::final_position(parameters, robot_task);
+      is::log::info("[New Task] Final position");
+    } else if (positions == speeds && positions > 0 && speeds > 0) {
+      new_task = task::trajectory(parameters, robot_task);
+      is::log::info("[New Task] Trajectoty");
+    } else if (positions > 1 && speeds == 0) {
+      new_task = task::path(parameters, robot_task);
+      is::log::info("[New Task] Path");
+    } else {
+      is::log::warn("[New Task] Invalid task received");
+      return is::msgpack(status::error("Invalid task"));
     }
+
+    mtx.lock();
+    task = new_task;
+    mtx.unlock();
+    return is::msgpack(status::ok);
   });
-  // clang-format on
+
+  auto thread = std::thread(&is::ServiceProvider::listen, provider);
 
   std::vector<std::string> topics;
   std::transform(std::begin(sources), std::end(sources), std::back_inserter(topics),
                  [](auto& s) { return s + ".pose"; });
 
-  // Waiting first task
-  // std::unique_lock<std::mutex> lk(mtx);
-  // new_task.wait(lk, [&] { return trajectory_received; });
-
   auto tag = is.subscribe(topics);
 
   std::map<std::string, is::Envelope::ptr_t> messages;
   vec current_pose;
-  vec desired_pose({desired_x, desired_y, 0.0});
-  vec trajectory_speed({0.0, 0.0});
-  enum State { CONSUMING, REFRESH_DEADLINE, WAIT_NEXT_LOOP, SEND_COMMAND, STOP_ROBOT };
+  enum State { CONSUMING, SAMPLING_DEADLINE_EXCEDEED, COMPUTE_COMMAND, WAIT_WINDOW_END };
   State state = CONSUMING;
 
-  auto period = static_cast<unsigned int>(1000.0 / rate);
-  auto deadline = high_resolution_clock::now() + milliseconds(period);
+  auto period_ns = static_cast<int64_t>(1e9 / rate);
+  int64_t window_end = is::time_since_epoch_ns() + period_ns;
+
   while (1) {
+    int64_t sampling_deadline = window_end - 0.1 * period_ns;
+    int64_t window_begin = window_end - period_ns;
     switch (state) {
       case CONSUMING: {
-        auto envelope = is::consume_until(is, tag, deadline);
-        if (envelope == nullptr) {
-          state = STOP_ROBOT;
+        auto envelope = is::consume_until(is, tag, sampling_deadline);
+        if (envelope != nullptr) {
+          messages[envelope->RoutingKey()] = envelope;
+
+          if (inside_window(messages.begin(), messages.end(), window_begin)) {
+            current_pose = mean_pose(messages.begin(), messages.end());
+            state = COMPUTE_COMMAND;
+          }
           break;
         }
-        is::log::info("New message from {}", envelope->RoutingKey());
-        messages.emplace(std::make_pair(envelope->RoutingKey(), envelope));
-        if (messages.size() == topics.size()) {
-          current_pose = mean_pose(messages.begin(), messages.end());
-          state = SEND_COMMAND;
-        }
+        state = SAMPLING_DEADLINE_EXCEDEED;
         break;
       }
-      case REFRESH_DEADLINE: {
-        messages.clear();
-        deadline += milliseconds(period);
-        state = CONSUMING;
+
+      case SAMPLING_DEADLINE_EXCEDEED: {
+        std::map<std::string, is::Envelope::ptr_t> filtered_messages;
+        std::copy_if(messages.begin(), messages.end(), std::inserter(filtered_messages, filtered_messages.begin()),
+                     [&](auto msg) { return static_cast<int64_t>(msg.second->Message()->Timestamp()) > window_begin; });
+        current_pose = mean_pose(filtered_messages.begin(), filtered_messages.end());
+        state = COMPUTE_COMMAND;
         break;
       }
-      case WAIT_NEXT_LOOP: {
-        is::Envelope::ptr_t envelope;
-        while (1) {
-          envelope = is::consume_until(is, tag, deadline);
-          if (envelope == nullptr)
-            break;
-          is::log::info("Discarding messages from {}", envelope->RoutingKey());
-        }
-        state = REFRESH_DEADLINE;
-        break;
-      }
-      case SEND_COMMAND: {
-        if (current_pose.empty()) {
-          is::log::warn("Pattern not found");
-          state = STOP_ROBOT;
-          break;
-        }
-        desired_pose = fence::limit_pose(current_pose, desired_pose, parameters.fence);
-        arma::vec speed = eval_speed(parameters, current_pose, desired_pose, trajectory_speed, 200.0);
+
+      case COMPUTE_COMMAND: {
+        mtx.lock();
+        arma::vec speed = task(current_pose);
+        mtx.unlock();
         speed = fence::limit_speed(current_pose, speed, parameters.fence);
         send_speed(client, robot, speed);
         is::log::info("Speed command sent: {},{}", speed(0), speed(1));
-        state = WAIT_NEXT_LOOP;
+        publish_pose(is, name, current_pose);
+        state = WAIT_WINDOW_END;
         break;
       }
-      case STOP_ROBOT: {
-        send_speed(client, robot, arma::mat(2, 1, fill::zeros));
-        is::log::warn("Stopping robot");
-        state = REFRESH_DEADLINE;
+
+      case WAIT_WINDOW_END: {
+        auto envelope = is::consume_until(is, tag, window_end);
+        if (envelope != nullptr) {
+          messages[envelope->RoutingKey()] = envelope;
+          break;
+        }
+        window_end += period_ns;
+        state = CONSUMING;
         break;
       }
     }
   }
-
   thread.join();
   return 0;
 }

@@ -17,12 +17,12 @@ using namespace is::msg::geometry;
 using namespace is::msg::common;
 using namespace boost;
 
-struct Trajectory {
+struct RobotTask {
   std::vector<Point> positions;  // <x,y> [mm]
   std::vector<Point> speeds;     // <dx,dy> [mm/s]
-  double final_error;
+  double stop_distance;          // [mm]
 
-  IS_DEFINE_MSG(positions, speeds, final_error)
+  IS_DEFINE_MSG(positions, speeds, stop_distance)
 };
 
 }  // ::controller

@@ -1,5 +1,5 @@
 center_offset: 200.0 # mm
 L: [250.0, 250.0] # max speed
 K: [0.3125, 0.3125] # 
-#fence: [-2000.0, 2000.0, -1000.0, 1000.0] #  x_min x_max y_min y_max
-fence: [-2500.0, 2000.0, -1000.0, 1000.0] #  x_min x_max y_min y_max
+# fence: [-2000.0, 2000.0, -1000.0, 1000.0] #  x_min x_max y_min y_max
+fence: [-2500.0, 2000.0, -1200.0, 1200.0] #  x_min x_max y_min y_max
