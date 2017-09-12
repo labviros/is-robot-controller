@@ -87,6 +87,15 @@ auto consume_until(is::Connection& is, is::QueueInfo const& tag, int64_t deadlin
 }
 }  // ::is
 
+namespace std {
+std::ostream& operator<<(std::ostream& os, const std::vector<std::string>& vec) {
+  for (auto item : vec) {
+    os << item << " ";
+  }
+  return os;
+}
+}  // ::std
+
 int main(int argc, char* argv[]) {
   std::string uri;
   std::string robot;
@@ -98,18 +107,19 @@ int main(int argc, char* argv[]) {
   auto&& options = description.add_options();
   options("help,", "show available options");
   options("uri,u", po::value<std::string>(&uri)->default_value("amqp://edge.is:30000"), "broker uri");
-  options("robot,r", po::value<std::string>(&robot), "robot name");
-  options("sources,s", po::value<std::vector<std::string>>(&sources)->multitoken(),
+  options("robot,r", po::value<std::string>(&robot)->default_value("robot.0"), "robot name");
+  options("sources,s", po::value<std::vector<std::string>>(&sources)->multitoken()->default_value(
+                           {"circles-pattern.0", "circles-pattern.1", "circles-pattern.2", "circles-pattern.3"}),
           "the list of topics where this service will consume poses");
   options("parameters,p", po::value<std::string>(&parameters_file)->default_value("parameters.yaml"),
           "yaml file with robot parameters");
-  options("rate,R", po::value<double>(&rate)->default_value(5.0), "sampling rate");
+  options("rate,R", po::value<double>(&rate)->default_value(4.0), "sampling rate");
 
   po::variables_map vm;
   po::store(po::parse_command_line(argc, argv, description), vm);
   po::notify(vm);
 
-  if (vm.count("help") || !vm.count("robot")) {
+  if (vm.count("help")) {
     std::cout << description << std::endl;
     return 1;
   }

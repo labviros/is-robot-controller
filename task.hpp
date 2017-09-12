@@ -52,36 +52,32 @@ auto final_position(robot::Parameters const& parameters, RobotTask const& robot_
 }
 
 auto trajectory(robot::Parameters const& parameters, RobotTask const& robot_task) {
-  auto positions = robot_task.positions;
-  auto speeds = robot_task.speeds;
+  auto task_positions = robot_task.positions;
+  auto task_speeds = robot_task.speeds;
   auto stop_distance = robot_task.stop_distance;
 
-  return [=](arma::vec const& current_pose) {
-    static auto position = positions.begin();
-    static auto speed = speeds.begin();
-
-    if (position == positions.end()) {
+  return [ positions = task_positions, speeds = task_speeds, i = std::size_t(0), stop_distance,
+           parameters ](arma::vec const& current_pose) mutable {
+    if (i == positions.size()) {
       arma::vec desired_pose = point2vec::pose(positions.back());
       return eval_speed(parameters, current_pose, desired_pose, stop_distance);
     }
 
-    arma::vec desired_pose = point2vec::pose(*position);
-    arma::vec trajectory_speed = point2vec::speed(*speed);
-    position++;
-    speed++;
+    arma::vec desired_pose = point2vec::pose(positions[i]);
+    arma::vec trajectory_speed = point2vec::speed(speeds[i]);
+    i++;
 
-    return eval_speed(parameters, current_pose, desired_pose, stop_distance, position == positions.end(),
-                      trajectory_speed);
+    return eval_speed(parameters, current_pose, desired_pose, stop_distance, i == positions.size(), trajectory_speed);
   };
 }
 
 auto path(robot::Parameters const& parameters, RobotTask const& robot_task) {
-  auto positions = robot_task.positions;
+  auto task_positions = robot_task.positions;
   auto stop_distance = robot_task.stop_distance;
 
   std::vector<double> distances;
-  auto previous = positions.begin();
-  std::transform(positions.begin() + 1, positions.end(), std::back_inserter(distances), [&](auto& position) {
+  auto previous = task_positions.begin();
+  std::transform(task_positions.begin() + 1, task_positions.end(), std::back_inserter(distances), [&](auto& position) {
     auto dx = (position.x - previous->x);
     auto dy = (position.y - previous->y);
     double distance = std::sqrt(dx * dx + dy * dy);
@@ -90,20 +86,21 @@ auto path(robot::Parameters const& parameters, RobotTask const& robot_task) {
   });
   auto switch_distance = std::accumulate(distances.begin(), distances.end(), 0.0) / distances.size();
 
-  return [=](arma::vec const& current_pose) {
-    static auto position = positions.begin();
-
-    if (position == positions.end()) {
+  return [ positions = task_positions, i = std::size_t(0), stop_distance, switch_distance,
+           parameters ](arma::vec const& current_pose) mutable {
+    if (i == positions.size()) {
       arma::vec desired_pose = point2vec::pose(positions.back());
       return eval_speed(parameters, current_pose, desired_pose, stop_distance);
     }
     if (current_pose.empty())
       return arma::vec({0.0, 0.0});
 
-    arma::vec desired_pose = point2vec::pose(*position);
+    arma::vec desired_pose = point2vec::pose(positions[i]);
     arma::vec error = desired_pose.subvec(0, 1) - current_pose.subvec(0, 1);
-    if (arma::norm(error) < switch_distance)
-      position++;
+    if (arma::norm(error) < switch_distance) {
+      is::log::info("Goal: {},{} | {},{}", positions[i].x, positions[i].y, desired_pose(0), desired_pose(1));
+      i++;
+    }
 
     return eval_speed(parameters, current_pose, desired_pose, stop_distance, false);
   };
