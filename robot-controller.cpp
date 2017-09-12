@@ -29,6 +29,33 @@ using namespace is::msg::geometry;
 using namespace is::msg::controller;
 namespace po = boost::program_options;
 
+int64_t eval_initial_deadline(is::Connection& is, std::vector<std::string> const& cameras, double rate) {
+  std::vector<std::string> ts_topics;
+  std::transform(std::begin(cameras), std::end(cameras), std::back_inserter(ts_topics),
+                 [](auto& s) { return s + ".timestamp"; });
+
+  auto ts_tag = is.subscribe(ts_topics);
+  std::map<std::string, int64_t> cameras_ts;
+  while (1) {
+    auto envelope = is.consume(ts_tag);
+    auto timestamp = is::msgpack<Timestamp>(envelope);
+    cameras_ts[envelope->RoutingKey()] = timestamp.nanoseconds;
+
+    if (cameras_ts.size() == ts_topics.size()) {
+      auto ts = std::minmax_element(cameras_ts.begin(), cameras_ts.end(),
+                                    [](auto lhs, auto rhs) { return lhs.second < rhs.second; });
+
+      auto min = (*(ts.first)).second;
+      auto max = (*(ts.second)).second;
+      auto diff = (max - min) / 1e6;
+      if (diff < (1000.0 / rate) / 5.0) {
+        is.unsubscribe(ts_tag);
+        return min + static_cast<int64_t>(1e9 / rate);
+      }
+    }
+  }
+}
+
 template <typename I>
 arma::vec mean_pose(I first, I last) {
   auto join_poses = [&](auto& total, auto& msg) {
@@ -99,6 +126,7 @@ std::ostream& operator<<(std::ostream& os, const std::vector<std::string>& vec) 
 int main(int argc, char* argv[]) {
   std::string uri;
   std::string robot;
+  std::vector<std::string> cameras;
   std::vector<std::string> sources;
   std::string parameters_file;
   double rate;
@@ -108,6 +136,9 @@ int main(int argc, char* argv[]) {
   options("help,", "show available options");
   options("uri,u", po::value<std::string>(&uri)->default_value("amqp://edge.is:30000"), "broker uri");
   options("robot,r", po::value<std::string>(&robot)->default_value("robot.0"), "robot name");
+  options("cameras,c", po::value<std::vector<std::string>>(&cameras)->multitoken()->default_value(
+                           {"ptgrey.0", "ptgrey.1", "ptgrey.2", "ptgrey.3"}),
+          "the list of cameras");
   options("sources,s", po::value<std::vector<std::string>>(&sources)->multitoken()->default_value(
                            {"circles-pattern.0", "circles-pattern.1", "circles-pattern.2", "circles-pattern.3"}),
           "the list of topics where this service will consume poses");
@@ -163,6 +194,9 @@ int main(int argc, char* argv[]) {
 
   auto thread = std::thread(&is::ServiceProvider::listen, provider);
 
+  auto period_ns = static_cast<int64_t>(1e9 / rate);
+  int64_t window_end = eval_initial_deadline(is, cameras, rate);
+
   std::vector<std::string> topics;
   std::transform(std::begin(sources), std::end(sources), std::back_inserter(topics),
                  [](auto& s) { return s + ".pose"; });
@@ -173,9 +207,6 @@ int main(int argc, char* argv[]) {
   vec current_pose;
   enum State { CONSUMING, SAMPLING_DEADLINE_EXCEDEED, COMPUTE_COMMAND, WAIT_WINDOW_END };
   State state = CONSUMING;
-
-  auto period_ns = static_cast<int64_t>(1e9 / rate);
-  int64_t window_end = is::time_since_epoch_ns() + period_ns;
 
   while (1) {
     int64_t sampling_deadline = window_end - 0.1 * period_ns;
