@@ -9,10 +9,13 @@ SERVICE = robot-controller
 VERSION = 1
 LOCAL_REGISTRY = git.is:5000
 
-all: $(SERVICE) test
+all: $(SERVICE) robot-status test
 
 clean:
-	rm -f $(SERVICE) 
+	rm -f $(SERVICE) robot-status test
+
+robot-status: robot-status.cpp
+	$(COMPILER) $^ -o $@ $(FLAGS) $(SO_DEPS) 
 
 test: test.cpp
 	$(COMPILER) $^ -o $@ $(FLAGS) $(SO_DEPS) 

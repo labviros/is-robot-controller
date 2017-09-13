@@ -3,8 +3,11 @@
 
 #include <armadillo>
 #include <is/logger.hpp>
+#include <is/msgs/robot.hpp>
 
 namespace fence {
+
+using namespace is::msg::robot;
 
 arma::mat limit_pose(arma::vec const& current_pose, arma::vec const& desired_pose, arma::vec const& fence) {
   auto x = current_pose(0);
@@ -47,6 +50,13 @@ arma::mat limit_speed(arma::vec const& current_pose, arma::vec const& speed, arm
     is::log::warn("Robot leaving critical area. Forcing stop.");
     return arma::mat(2, 1, arma::fill::zeros);
   }
+  return speed;
+}
+
+Speed limit_speed(arma::vec const& current_pose, Speed speed, arma::vec const& fence) {
+  arma::vec speed_vec = limit_speed(current_pose, arma::vec({speed.linear, speed.angular}), fence);
+  speed.linear = speed_vec(0);
+  speed.angular = speed_vec(1);
   return speed;
 }
 

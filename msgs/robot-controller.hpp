@@ -25,6 +25,15 @@ struct RobotTask {
   IS_DEFINE_MSG(positions, speeds, stop_distance)
 };
 
+struct RobotControllerStatus {
+  Speed speed;
+  optional<Pose> current_pose;
+  optional<Pose> desired_pose;
+  bool arrived;
+    
+  IS_DEFINE_MSG(speed ,current_pose ,desired_pose ,arrived)
+};
+
 }  // ::controller
 }  // ::msg
 }  // ::is

@@ -21,25 +21,50 @@ arma::vec speed(Point const& point) {
 }
 }  // ::task::point2vec
 
-arma::vec eval_speed(robot::Parameters const& parameters, arma::vec const& current_pose, arma::vec const& desired_pose,
-                     double stop_distance, bool stop_condition = true,
-                     arma::vec const& trajectory_speed = arma::vec({0.0, 0.0})) {
+RobotControllerStatus make_status(arma::vec const& current_pose, arma::vec const& desired_pose, arma::vec const& speed,
+                                  bool arrived) {
+  RobotControllerStatus status;
+  if (!current_pose.empty()) {
+    Pose pose;
+    pose.position.x = current_pose(0);
+    pose.position.y = current_pose(1);
+    pose.heading = current_pose(2);
+    status.current_pose = pose;
+  }
+  if (!desired_pose.empty()) {
+    Pose pose;
+    pose.position.x = desired_pose(0);
+    pose.position.y = desired_pose(1);
+    pose.heading = desired_pose(2);
+    status.desired_pose = pose;
+  }
+  status.speed.linear = speed(0);
+  status.speed.angular = speed(1);
+  status.arrived = arrived;
+  return status;
+}
+
+std::pair<arma::vec, bool> eval_speed(robot::Parameters const& parameters, arma::vec const& current_pose,
+                                      arma::vec const& desired_pose, double stop_distance, bool stop_condition = true,
+                                      arma::vec const& trajectory_speed = arma::vec({0.0, 0.0})) {
   if (current_pose.empty())
-    return arma::vec({0.0, 0.0});
+    return std::make_pair(arma::vec({0.0, 0.0}), false);
   arma::vec error = desired_pose.subvec(0, 1) - current_pose.subvec(0, 1);
   if (stop_condition && arma::norm(error) < stop_distance)
-    return arma::vec({0.0, 0.0});
+    return std::make_pair(arma::vec({0.0, 0.0}), true);
   auto heading = current_pose(2);
   auto a = parameters.center_offset;
   auto L = parameters.L;
   auto K = parameters.K;
   arma::mat invA = {{cos(heading), sin(heading)}, {-(1.0 / a) * sin(heading), (1.0 / a) * cos(heading)}};
   arma::vec C = trajectory_speed + L % tanh((K / L) % error);
-  return invA * C;
+  return std::make_pair(invA * C, false);
 }
 
 auto none() {
-  return [](arma::vec) { return arma::vec({0.0, 0.0}); };
+  return [](arma::vec const& current_pose) {
+    return make_status(current_pose, arma::vec(), arma::vec({0.0, 0.0}), true);
+  };
 }
 
 auto final_position(robot::Parameters const& parameters, RobotTask const& robot_task) {
@@ -47,8 +72,12 @@ auto final_position(robot::Parameters const& parameters, RobotTask const& robot_
   auto stop_distance = robot_task.stop_distance;
   arma::vec desired_pose = point2vec::pose(desired_point);
 
-  return
-      [=](arma::vec const& current_pose) { return eval_speed(parameters, current_pose, desired_pose, stop_distance); };
+  return [=](arma::vec const& current_pose) {
+    auto speed_arrived = eval_speed(parameters, current_pose, desired_pose, stop_distance);
+    auto speed = speed_arrived.first;
+    auto arrived = speed_arrived.second;
+    return make_status(current_pose, desired_pose, speed, arrived);
+  };
 }
 
 auto trajectory(robot::Parameters const& parameters, RobotTask const& robot_task) {
@@ -60,14 +89,21 @@ auto trajectory(robot::Parameters const& parameters, RobotTask const& robot_task
            parameters ](arma::vec const& current_pose) mutable {
     if (i == positions.size()) {
       arma::vec desired_pose = point2vec::pose(positions.back());
-      return eval_speed(parameters, current_pose, desired_pose, stop_distance);
+      auto speed_arrived = eval_speed(parameters, current_pose, desired_pose, stop_distance);
+      auto speed = speed_arrived.first;
+      auto arrived = speed_arrived.second;
+      return make_status(current_pose, desired_pose, speed, arrived);
     }
 
     arma::vec desired_pose = point2vec::pose(positions[i]);
     arma::vec trajectory_speed = point2vec::speed(speeds[i]);
     i++;
 
-    return eval_speed(parameters, current_pose, desired_pose, stop_distance, i == positions.size(), trajectory_speed);
+    auto speed_arrived =
+        eval_speed(parameters, current_pose, desired_pose, stop_distance, i == positions.size(), trajectory_speed);
+    auto speed = speed_arrived.first;
+    auto arrived = speed_arrived.second;
+    return make_status(current_pose, desired_pose, speed, arrived);
   };
 }
 
@@ -90,19 +126,23 @@ auto path(robot::Parameters const& parameters, RobotTask const& robot_task) {
            parameters ](arma::vec const& current_pose) mutable {
     if (i == positions.size()) {
       arma::vec desired_pose = point2vec::pose(positions.back());
-      return eval_speed(parameters, current_pose, desired_pose, stop_distance);
+      auto speed_arrived = eval_speed(parameters, current_pose, desired_pose, stop_distance);
+      auto speed = speed_arrived.first;
+      auto arrived = speed_arrived.second;
+      return make_status(current_pose, desired_pose, speed, arrived);
     }
     if (current_pose.empty())
-      return arma::vec({0.0, 0.0});
+      return make_status(current_pose, point2vec::pose(positions[i]), arma::vec({0.0, 0.0}), false);
 
     arma::vec desired_pose = point2vec::pose(positions[i]);
     arma::vec error = desired_pose.subvec(0, 1) - current_pose.subvec(0, 1);
-    if (arma::norm(error) < switch_distance) {
-      is::log::info("Goal: {},{} | {},{}", positions[i].x, positions[i].y, desired_pose(0), desired_pose(1));
+    if (arma::norm(error) < switch_distance)
       i++;
-    }
 
-    return eval_speed(parameters, current_pose, desired_pose, stop_distance, false);
+    auto speed_arrived = eval_speed(parameters, current_pose, desired_pose, stop_distance, false);
+    auto speed = speed_arrived.first;
+    auto arrived = speed_arrived.second;
+    return make_status(current_pose, desired_pose, speed, arrived);
   };
 }
 

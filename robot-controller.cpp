@@ -83,24 +83,14 @@ bool inside_window(I first, I last, int64_t timestamp) {
                      [&](auto msg) { return static_cast<int64_t>(msg.second->Message()->Timestamp()) > timestamp; });
 }
 
-void send_speed(is::ServiceClient& client, std::string const& robot, arma::vec const& speed) {
-  Speed command{speed(0), speed(1)};
-  auto id = client.request(robot + ".set_speed", is::msgpack(command));
+void send_speed(is::ServiceClient& client, std::string const& robot, Speed const& speed) {
+  auto id = client.request(robot + ".set_speed", is::msgpack(speed));
   client.receive_for(milliseconds(1), id, is::policy::discard_others);
 }
 
-void publish_pose(is::Connection& is, std::string const& name, arma::vec const& current_pose) {
-  optional<Pose> visual_pose;
-  if (!current_pose.empty()) {
-    Pose pose;
-    pose.position.x = current_pose(0);
-    pose.position.y = current_pose(1);
-    pose.heading = current_pose(2);
-    visual_pose = pose;
-  } else {
-    visual_pose = none;
-  }
-  is.publish(name + ".pose", is::msgpack(visual_pose));
+void publish_data(is::Connection& is, std::string const& name, RobotControllerStatus const& status) {
+  is.publish(name + ".pose", is::msgpack(status.current_pose));
+  is.publish(name + ".status", is::msgpack(status));
 }
 
 namespace is {
@@ -158,7 +148,7 @@ int main(int argc, char* argv[]) {
   robot::Parameters parameters(parameters_file);
 
   std::mutex mtx;
-  std::function<arma::vec(arma::vec)> task = task::none();
+  std::function<RobotControllerStatus(arma::vec)> task = task::none();
 
   auto is = is::connect(uri);
   auto client = is::make_client(is);
@@ -171,7 +161,7 @@ int main(int argc, char* argv[]) {
     auto positions = robot_task.positions.size();
     auto speeds = robot_task.speeds.size();
 
-    std::function<arma::vec(arma::vec)> new_task;
+    std::function<RobotControllerStatus(arma::vec)> new_task;
     if (positions == 1 && speeds == 0) {
       new_task = task::final_position(parameters, robot_task);
       is::log::info("[New Task] Final position");
@@ -238,12 +228,12 @@ int main(int argc, char* argv[]) {
 
       case COMPUTE_COMMAND: {
         mtx.lock();
-        arma::vec speed = task(current_pose);
+        auto controller_status = task(current_pose);
         mtx.unlock();
-        speed = fence::limit_speed(current_pose, speed, parameters.fence);
-        send_speed(client, robot, speed);
-        is::log::info("Speed command sent: {},{}", speed(0), speed(1));
-        publish_pose(is, name, current_pose);
+        controller_status.speed = fence::limit_speed(current_pose, controller_status.speed, parameters.fence);
+        send_speed(client, robot, controller_status.speed);
+        is::log::info("Speed command sent: {},{}", controller_status.speed.linear, controller_status.speed.angular);
+        publish_data(is, name, controller_status);
         state = WAIT_WINDOW_END;
         break;
       }
