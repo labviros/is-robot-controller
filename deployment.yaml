@@ -14,7 +14,7 @@ spec:
         kubernetes.io/hostname: edge
       containers:
       - name: robot-controller-0
-        image: git.is:5000/robot-controller:1
+        image: git.is:5000/robot-controller:1.1
         command: ["./robot-controller"]
         args: ["-u", "amqp://rabbitmq.kube-system", "-r", "robot.0", "-R", "4.0", "-s", "circles-pattern.0", "circles-pattern.1", "circles-pattern.2", "circles-pattern.3"]
         imagePullPolicy: Always
