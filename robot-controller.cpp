@@ -30,6 +30,7 @@ using namespace is::msg::controller;
 namespace po = boost::program_options;
 
 int64_t eval_initial_deadline(is::Connection& is, std::vector<std::string> const& cameras, double rate) {
+  is::log::info("Evaluating initial deadline");
   std::vector<std::string> ts_topics;
   std::transform(std::begin(cameras), std::end(cameras), std::back_inserter(ts_topics),
                  [](auto& s) { return s + ".timestamp"; });
@@ -148,11 +149,33 @@ int main(int argc, char* argv[]) {
   robot::Parameters parameters(parameters_file);
 
   std::mutex mtx;
-  std::function<RobotControllerStatus(arma::vec)> task = task::none();
+  std::function<RobotControllerStatus(arma::vec)> task = task::none(parameters);
 
   auto is = is::connect(uri);
   auto client = is::make_client(is);
 
+  int64_t time_to_sync = 100/rate;
+
+  is::log::info("Sending sync request. Waiting {} seconds for reply", time_to_sync);
+  SyncRequest sync_request;
+  sync_request.entities = cameras;
+  SamplingRate sampling_rate;
+  sampling_rate.rate = rate;
+  sync_request.sampling_rate = sampling_rate;
+
+  auto sync_id = client.request("is.sync", is::msgpack(sync_request));
+  auto sync_reply_msg = client.receive_for(std::chrono::seconds(time_to_sync), sync_id, is::policy::discard_others);
+  if (sync_reply_msg == nullptr) {
+    is::log::warn("The sync service didn't respond. Exiting...");
+    exit(1);
+  }
+  auto sync_reply = is::msgpack<Status>(sync_reply_msg);
+  if (sync_reply.value == "error") {
+    is::log::warn("Sync service replied with an error: {}", sync_reply.why);
+    exit(1);
+  }
+  is::log::info("Sync succesfull!");
+  
   std::string name = "robot-controller" + robot.substr(robot.find_last_of('.'));
   auto provider = is::ServiceProvider(name, is::make_channel(uri));
 

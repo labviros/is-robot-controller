@@ -28,10 +28,12 @@ struct RobotTask {
 struct RobotControllerStatus {
   Speed speed;
   optional<Pose> current_pose;
+  optional<Pose> control_pose;
   optional<Pose> desired_pose;
+  optional<double> error;
   bool arrived;
-    
-  IS_DEFINE_MSG(speed ,current_pose ,desired_pose ,arrived)
+
+  IS_DEFINE_MSG(speed, current_pose, control_pose, desired_pose, error, arrived)
 };
 
 }  // ::controller
