@@ -48,5 +48,6 @@
         "typeinfo": "cpp",
         "utility": "cpp",
         "*.ipp": "cpp"
-    }
+    },
+    "python.linting.pylintEnabled": false
 }

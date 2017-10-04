@@ -89,6 +89,23 @@ std::tuple<arma::vec, arma::vec, bool> eval_speed(robot::Parameters const& param
   return std::make_tuple(invA * C, control_pose, false);
 }
 
+// returns <speed, control_pose, arrived>
+std::tuple<arma::vec, arma::vec, bool> eval_rotspeed(robot::Parameters const& parameters, arma::vec const& current_pose,
+                                                     double desired_heading, double stop_heading) {
+  if (current_pose.empty())
+    return std::make_tuple(arma::vec({0.0, 0.0}), current_pose, false);
+  auto current_heading = current_pose(2);
+  auto w_max = parameters.w_max;
+  auto a = parameters.center_offset;
+  arma::vec control_pose = make_control_pose(current_pose, a);
+
+  auto error = desired_heading - current_heading;
+  auto w = w_max * tanh(error);
+  if (std::fabs(error) < stop_heading)
+    return std::make_tuple(arma::vec({0.0, 0.0}), control_pose, true);
+  return std::make_tuple(arma::vec({0.0, w}), control_pose, false);
+}
+
 auto none(robot::Parameters const& parameters) {
   auto a = parameters.center_offset;
   return [=](arma::vec const& current_pose) {
@@ -104,6 +121,20 @@ auto final_position(robot::Parameters const& parameters, RobotTask const& robot_
 
   return [=](arma::vec const& current_pose) {
     auto eval_output = eval_speed(parameters, current_pose, desired_pose, stop_distance);
+    return make_status(current_pose, desired_pose, eval_output);
+  };
+}
+
+auto final_heading(robot::Parameters const& parameters, RobotTask const& robot_task) {
+  auto desired_heading = *(robot_task.desired_heading);
+  auto stop_heading =
+      robot_task.stop_heading ? *(robot_task.stop_heading) : 5.0 * (atan(1) / 45.0);  // default value is 5.0 deg
+
+  return [=](arma::vec const& current_pose) {
+    auto eval_output = eval_rotspeed(parameters, current_pose, desired_heading, stop_heading);
+    auto desired_pose = std::get<1>(eval_output);
+    if (!desired_pose.empty())
+      desired_pose(2) = desired_heading;
     return make_status(current_pose, desired_pose, eval_output);
   };
 }

@@ -35,6 +35,7 @@ struct Parameters {
   arma::vec L;
   arma::vec K;
   arma::vec fence;
+  double w_max;
 
   Parameters() {}
   Parameters(std::string const& filename) {
@@ -43,6 +44,7 @@ struct Parameters {
     this->K = node["K"].as<arma::vec>();
     this->L = node["L"].as<arma::vec>();
     this->fence = node["fence"].as<arma::vec>();
+    this->w_max = node["w_max"].as<double>();
   }
 };
 }  // ::robot

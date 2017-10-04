@@ -131,7 +131,7 @@ int main(int argc, char* argv[]) {
                            {"ptgrey.0", "ptgrey.1", "ptgrey.2", "ptgrey.3"}),
           "the list of cameras");
   options("sources,s", po::value<std::vector<std::string>>(&sources)->multitoken()->default_value(
-                           {"circles-pattern.0", "circles-pattern.1", "circles-pattern.2", "circles-pattern.3"}),
+                           {"aruco-tracker.0", "aruco-tracker.1", "aruco-tracker.2", "aruco-tracker.3"}),
           "the list of topics where this service will consume poses");
   options("parameters,p", po::value<std::string>(&parameters_file)->default_value("parameters.yaml"),
           "yaml file with robot parameters");
@@ -154,7 +154,7 @@ int main(int argc, char* argv[]) {
   auto is = is::connect(uri);
   auto client = is::make_client(is);
 
-  int64_t time_to_sync = 100/rate;
+  int64_t time_to_sync = 100 / rate;
 
   is::log::info("Sending sync request. Waiting {} seconds for reply", time_to_sync);
   SyncRequest sync_request;
@@ -175,7 +175,7 @@ int main(int argc, char* argv[]) {
     exit(1);
   }
   is::log::info("Sync succesfull!");
-  
+
   std::string name = "robot-controller" + robot.substr(robot.find_last_of('.'));
   auto provider = is::ServiceProvider(name, is::make_channel(uri));
 
@@ -183,6 +183,7 @@ int main(int argc, char* argv[]) {
     auto robot_task = is::msgpack<RobotTask>(request);
     auto positions = robot_task.positions.size();
     auto speeds = robot_task.speeds.size();
+    auto desired_heading = robot_task.desired_heading;
 
     std::function<RobotControllerStatus(arma::vec)> new_task;
     if (positions == 1 && speeds == 0) {
@@ -194,6 +195,9 @@ int main(int argc, char* argv[]) {
     } else if (positions > 1 && speeds == 0) {
       new_task = task::path(parameters, robot_task);
       is::log::info("[New Task] Path");
+    } else if (desired_heading) {
+      new_task = task::final_heading(parameters, robot_task);
+      is::log::info("[New Task] Final heading");
     } else {
       is::log::warn("[New Task] Invalid task received");
       return is::msgpack(status::error("Invalid task"));
@@ -253,6 +257,11 @@ int main(int argc, char* argv[]) {
         mtx.lock();
         auto controller_status = task(current_pose);
         mtx.unlock();
+        if (current_pose.empty()) {
+          is::log::info("Pose: ?, ?, ?");
+        } else {
+          is::log::info("Pose: {}, {}, {}", current_pose(0), current_pose(1), current_pose(2) * (45.0 / atan(1)));
+        }
         controller_status.speed = fence::limit_speed(current_pose, controller_status.speed, parameters.fence);
         send_speed(client, robot, controller_status.speed);
         is::log::info("Speed command sent: {},{}", controller_status.speed.linear, controller_status.speed.angular);

@@ -27,6 +27,7 @@ int main(int argc, char* argv[]) {
   double rate;
   double desired_x;
   double desired_y;
+  double desired_heading;
   double tf;
   double x0;
   double y0;
@@ -41,7 +42,7 @@ int main(int argc, char* argv[]) {
   options("topic,T", po::value<std::string>(&topic)->default_value("robot-controller.0.do-task"),
           "topic to request robot task");
   options("type,t", po::value<std::string>(&type)->default_value("none"),
-          "Task type [none/final_position/trajectory/path/8/generic]");
+          "Task type [none/final_position/final_heading/trajectory/path/8/generic]");
   options("desired_x,x", po::value<double>(&desired_x)->default_value(0.0),
           "Desired x pose. Use with 'final_position' type. In '8' type means ax");
   options("desired_y,y", po::value<double>(&desired_y)->default_value(0.0),
@@ -50,6 +51,9 @@ int main(int argc, char* argv[]) {
   options("x0,X", po::value<double>(&x0)->default_value(0.0), "In '8' type means 'x' center coordinate");
   options("y0,Y", po::value<double>(&y0)->default_value(0.0), "In '8' type means 'y' center coordinate");
   options("phase,p", po::value<double>(&phi)->default_value(pi / 3.0), "trajectory phase");
+
+  options("desired_heading,h", po::value<double>(&desired_heading)->default_value(0.0),
+          "Desired heading [deg]. Use with 'final_heading' type.");
 
   po::variables_map vm;
   po::store(po::parse_command_line(argc, argv, description), vm);
@@ -69,6 +73,9 @@ int main(int argc, char* argv[]) {
     robot_task.positions.push_back(p);
     robot_task.stop_distance = 100.0;
 
+  } else if (type == "final_heading") {
+    robot_task.desired_heading = desired_heading * (pi / 180.0);
+    robot_task.stop_heading = 5.0 * (pi / 180.0);
   } else if (type == "trajectory") {
     const double R = 900.0;      // [mm]
     const double w = 250.0 / R;  // lx => max_vel

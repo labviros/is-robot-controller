@@ -16,9 +16,8 @@ spec:
       - name: robot-controller-0
         image: git.is:5000/robot-controller:1.1
         command: ["./robot-controller"]
-        args: ["-u", "amqp://rabbitmq.kube-system", "-r", "robot.0", "-R", "4.0", "-s", "circles-pattern.0", "circles-pattern.1", "circles-pattern.2", "circles-pattern.3"]
+        args: ["-u", "amqp://rabbitmq.kube-system", "-r", "robot.0", "-R", "10.0", "-s", "aruco-tracker.0", "aruco-tracker.1", "aruco-tracker.2", "aruco-tracker.3"]
         imagePullPolicy: Always
         resources:
           limits:
-#            cpu: 800m
             memory: 256Mi

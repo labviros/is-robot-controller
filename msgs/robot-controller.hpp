@@ -18,11 +18,13 @@ using namespace is::msg::common;
 using namespace boost;
 
 struct RobotTask {
-  std::vector<Point> positions;  // <x,y> [mm]
-  std::vector<Point> speeds;     // <dx,dy> [mm/s]
-  double stop_distance;          // [mm]
+  std::vector<Point> positions;             // <x,y> [mm]
+  std::vector<Point> speeds;                // <dx,dy> [mm/s]
+  double stop_distance;                     // [mm]
+  boost::optional<double> desired_heading;  // [rad]
+  boost::optional<double> stop_heading;     // [rad]
 
-  IS_DEFINE_MSG(positions, speeds, stop_distance)
+  IS_DEFINE_MSG(positions, speeds, stop_distance, desired_heading, stop_heading)
 };
 
 struct RobotControllerStatus {
