@@ -109,7 +109,8 @@ std::tuple<arma::vec, arma::vec, bool> eval_rotspeed(robot::Parameters const& pa
 auto none(robot::Parameters const& parameters) {
   auto a = parameters.center_offset;
   return [=](arma::vec const& current_pose) {
-    return make_status(current_pose, arma::vec(),
+
+    return make_status(current_pose, make_control_pose(current_pose, a),
                        std::make_tuple(arma::vec({0.0, 0.0}), make_control_pose(current_pose, a), true));
   };
 }
