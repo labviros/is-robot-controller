@@ -135,7 +135,7 @@ int main(int argc, char* argv[]) {
           "the list of topics where this service will consume poses");
   options("parameters,p", po::value<std::string>(&parameters_file)->default_value("parameters.yaml"),
           "yaml file with robot parameters");
-  options("rate,R", po::value<double>(&rate)->default_value(4.0), "sampling rate");
+  options("rate,R", po::value<double>(&rate)->default_value(5.0), "sampling rate");
 
   po::variables_map vm;
   po::store(po::parse_command_line(argc, argv, description), vm);
@@ -150,31 +150,12 @@ int main(int argc, char* argv[]) {
 
   std::mutex mtx;
   std::function<RobotControllerStatus(arma::vec)> task = task::none(parameters);
+  std::atomic_bool do_sync;
+  SamplingRate sampling_rate_task;
+  sampling_rate_task.rate = rate;
 
   auto is = is::connect(uri);
   auto client = is::make_client(is);
-
-  int64_t time_to_sync = 100 / rate;
-
-  is::log::info("Sending sync request. Waiting {} seconds for reply", time_to_sync);
-  SyncRequest sync_request;
-  sync_request.entities = cameras;
-  SamplingRate sampling_rate;
-  sampling_rate.rate = rate;
-  sync_request.sampling_rate = sampling_rate;
-
-  auto sync_id = client.request("is.sync", is::msgpack(sync_request));
-  auto sync_reply_msg = client.receive_for(std::chrono::seconds(time_to_sync), sync_id, is::policy::discard_others);
-  if (sync_reply_msg == nullptr) {
-    is::log::warn("The sync service didn't respond. Exiting...");
-    exit(1);
-  }
-  auto sync_reply = is::msgpack<Status>(sync_reply_msg);
-  if (sync_reply.value == "error") {
-    is::log::warn("Sync service replied with an error: {}", sync_reply.why);
-    exit(1);
-  }
-  is::log::info("Sync succesfull!");
 
   std::string name = "robot-controller" + robot.substr(robot.find_last_of('.'));
   auto provider = is::ServiceProvider(name, is::make_channel(uri));
@@ -205,7 +186,9 @@ int main(int argc, char* argv[]) {
 
     mtx.lock();
     task = new_task;
+    sampling_rate_task = robot_task.sampling_rate;
     mtx.unlock();
+    do_sync.store(true);
     return is::msgpack(status::ok);
   });
 
@@ -222,13 +205,47 @@ int main(int argc, char* argv[]) {
 
   std::map<std::string, is::Envelope::ptr_t> messages;
   vec current_pose;
-  enum State { CONSUMING, SAMPLING_DEADLINE_EXCEDEED, COMPUTE_COMMAND, WAIT_WINDOW_END };
-  State state = CONSUMING;
+  enum State { CONSUMING, SAMPLING_DEADLINE_EXCEDEED, COMPUTE_COMMAND, WAIT_WINDOW_END, SYNCING };
+  State state = SYNCING;
 
   while (1) {
     int64_t sampling_deadline = window_end - 0.1 * period_ns;
     int64_t window_begin = window_end - period_ns;
     switch (state) {
+      case SYNCING: {
+        auto rate = *(sampling_rate_task.rate);
+        int64_t time_to_sync = 100 / rate;
+        is::log::info("Sending sync request. Waiting {} seconds for reply.", time_to_sync);
+
+        SyncRequest sync_request;
+        sync_request.entities = cameras;
+        mtx.lock();
+        sync_request.sampling_rate = sampling_rate_task;
+        mtx.unlock();
+
+        auto sync_id = client.request("is.sync", is::msgpack(sync_request));
+        auto sync_reply_msg = client.receive_for(seconds(time_to_sync), sync_id, is::policy::discard_others);
+        if (sync_reply_msg == nullptr) {
+          is::log::warn("The sync service didn't respond");
+          state = SYNCING;
+          break;
+        }
+        auto sync_reply = is::msgpack<Status>(sync_reply_msg);
+        if (sync_reply.value == "error") {
+          is::log::warn("Sync service replied with an error: {}", sync_reply.why);
+          state = SYNCING;
+          break;
+        }
+
+        period_ns = static_cast<int64_t>(1e9 / rate);
+        window_end = eval_initial_deadline(is, cameras, rate);
+        do_sync.store(false);
+
+        is::log::info("Sync succesfull!");
+        state = CONSUMING;
+        break;
+      }
+
       case CONSUMING: {
         auto envelope = is::consume_until(is, tag, sampling_deadline);
         if (envelope != nullptr) {
@@ -277,7 +294,7 @@ int main(int argc, char* argv[]) {
           break;
         }
         window_end += period_ns;
-        state = CONSUMING;
+        state = do_sync.load() ? SYNCING : CONSUMING;
         break;
       }
     }

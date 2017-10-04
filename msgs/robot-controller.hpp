@@ -1,7 +1,6 @@
 #ifndef __IS_MSG_ROBOT_CONTROLLER_HPP__
 #define __IS_MSG_ROBOT_CONTROLLER_HPP__
 
-#include <is/msgs/camera.hpp>
 #include <is/msgs/common.hpp>
 #include <is/msgs/geometry.hpp>
 #include <is/msgs/robot.hpp>
@@ -12,7 +11,6 @@ namespace msg {
 namespace controller {
 
 using namespace is::msg::robot;
-using namespace is::msg::camera;
 using namespace is::msg::geometry;
 using namespace is::msg::common;
 using namespace boost;
@@ -23,8 +21,9 @@ struct RobotTask {
   double stop_distance;                     // [mm]
   boost::optional<double> desired_heading;  // [rad]
   boost::optional<double> stop_heading;     // [rad]
+  SamplingRate sampling_rate;
 
-  IS_DEFINE_MSG(positions, speeds, stop_distance, desired_heading, stop_heading)
+  IS_DEFINE_MSG(positions, speeds, stop_distance, desired_heading, stop_heading, sampling_rate)
 };
 
 struct RobotControllerStatus {

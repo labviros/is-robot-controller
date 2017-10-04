@@ -38,7 +38,7 @@ int main(int argc, char* argv[]) {
   auto&& options = description.add_options();
   options("help,", "show available options");
   options("uri,u", po::value<std::string>(&uri)->default_value("amqp://edge.is:30000"), "broker uri");
-  options("rate,R", po::value<double>(&rate)->default_value(4.0), "sampling rate");
+  options("rate,R", po::value<double>(&rate)->default_value(5.0), "sampling rate");
   options("topic,T", po::value<std::string>(&topic)->default_value("robot-controller.0.do-task"),
           "topic to request robot task");
   options("type,t", po::value<std::string>(&type)->default_value("none"),
@@ -65,6 +65,9 @@ int main(int argc, char* argv[]) {
   }
 
   RobotTask robot_task;
+  SamplingRate sampling_rate;
+  sampling_rate.rate = rate;
+  robot_task.sampling_rate = sampling_rate;
 
   if (type == "final_position") {
     Point p;
