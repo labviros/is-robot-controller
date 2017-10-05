@@ -6,7 +6,7 @@ SO_DEPS += -lboost_program_options -lboost_system -lboost_filesystem -lpthread -
 
 MAINTAINER = mendonca
 SERVICE = robot-controller
-VERSION = 1.1
+VERSION = 1.2
 LOCAL_REGISTRY = git.is:5000
 
 all: $(SERVICE) robot-status test
