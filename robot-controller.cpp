@@ -294,6 +294,8 @@ int main(int argc, char* argv[]) {
           break;
         }
         window_end += period_ns;
+        if (do_sync.load())
+          send_speed(client, robot, {0.0, 0.0});
         state = do_sync.load() ? SYNCING : CONSUMING;
         break;
       }

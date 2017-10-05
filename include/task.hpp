@@ -1,11 +1,13 @@
 #ifndef __TASK_HPP__
 #define __TASK_HPP__
 
+#include <yaml-cpp/yaml.h>
 #include <armadillo>
 #include <cmath>
 #include <functional>
 #include <is/msgs/geometry.hpp>
 #include "../msgs/robot-controller.hpp"
+#include "robot-parameters.hpp"
 
 namespace task {
 
@@ -20,6 +22,30 @@ arma::vec speed(Point const& point) {
   return arma::vec({point.x, point.y});
 }
 }  // ::task::point2vec
+
+Point vec2point(arma::rowvec const& v) {
+  Point p;
+  p.x = v(0);
+  p.y = v(1);
+  return p;
+}
+
+RobotTask from_file(std::string const& filename) {
+  YAML::Node node = YAML::LoadFile(filename);
+  RobotTask robot_task;
+
+  SamplingRate sampling_rate;
+  sampling_rate.rate = node["rate"].as<double>();
+  robot_task.sampling_rate = sampling_rate;
+  robot_task.stop_distance = node["stop_distance"].as<double>();
+
+  arma::mat positions = join_horiz(node["X"].as<arma::vec>(), node["Y"].as<arma::vec>());
+  arma::mat speeds = join_horiz(node["dX"].as<arma::vec>(), node["dY"].as<arma::vec>());
+  positions.each_row([&](arma::rowvec const& position) { robot_task.positions.push_back(vec2point(position)); });
+  speeds.each_row([&](arma::rowvec const& speed) { robot_task.speeds.push_back(vec2point(speed)); });
+
+  return robot_task;
+}
 
 RobotControllerStatus make_status(arma::vec const& current_pose, arma::vec const& desired_pose,
                                   std::tuple<arma::vec, arma::vec, bool> const& eval_speed_output) {
