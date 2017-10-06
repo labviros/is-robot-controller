@@ -194,8 +194,8 @@ int main(int argc, char* argv[]) {
 
   auto thread = std::thread(&is::ServiceProvider::listen, provider);
 
-  auto period_ns = static_cast<int64_t>(1e9 / rate);
-  int64_t window_end = eval_initial_deadline(is, cameras, rate);
+  int64_t period_ns = static_cast<int64_t>(1e9 / rate);
+  int64_t window_end = is::time_since_epoch_ns();
 
   std::vector<std::string> topics;
   std::transform(std::begin(sources), std::end(sources), std::back_inserter(topics),
