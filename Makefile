@@ -1,37 +1,47 @@
-COMPILER = g++
-FLAGS = -std=c++14 -O3 -Wall -Werror -Wextra -Wpedantic
+CXX = clang++
+CXXFLAGS += -std=c++14 -Wall -Werror
+DEBUGFLAGS = -g -fsanitize=address -fno-omit-frame-pointer
+RELEASEFLAGS = -O2
+BUILDFLAGS = $(RELEASEFLAGS)
+LDFLAGS += -L/usr/local/lib -I/usr/local/include \
+			`pkg-config --libs protobuf librabbitmq libSimpleAmqpClient`\
+			-lpthread -lboost_program_options -lboost_system -lboost_filesystem\
+			-lismsgs -larmadillo -lyaml-cpp\
+			-Wl,--no-as-needed -Wl,--as-needed -ldl
+PROTOC = protoc
 
-SO_DEPS = $(shell pkg-config --libs --cflags libSimpleAmqpClient msgpack librabbitmq opencv theoradec theoraenc)
-SO_DEPS += -lboost_program_options -lboost_system -lboost_filesystem -lpthread -larmadillo -lyaml-cpp -Iinclude/
+LOCAL_PROTOS_PATH = ./msgs/
+vpath %.proto $(LOCAL_PROTOS_PATH)
 
 MAINTAINER = mendonca
-SERVICE = robot-controller
-VERSION = 1.2
+SERVICE = service
+VERSION = 1
 LOCAL_REGISTRY = git.is:5000
 
-all: $(SERVICE) robot-status test
+all: $(SERVICE) test
 
 clean:
-	rm -f $(SERVICE) robot-status test
+	rm -f *.o *.pb.cc *.pb.h service test
 
-robot-status: robot-status.cpp
-	$(COMPILER) $^ -o $@ $(FLAGS) $(SO_DEPS) 
+service: service.o
+	$(CXX) $^ $(LDFLAGS) $(BUILDFLAGS) -o $@
 
-test: test.cpp
-	$(COMPILER) $^ -o $@ $(FLAGS) $(SO_DEPS) 
+test: test.o
+	$(CXX) $^ $(LDFLAGS) $(BUILDFLAGS) -o $@
 
-$(SERVICE): $(SERVICE).cpp
-	$(COMPILER) $^ -o $@ $(FLAGS) $(SO_DEPS) 
+.PRECIOUS: %.pb.cc
+%.pb.cc: %.proto
+	$(PROTOC) -I $(LOCAL_PROTOS_PATH) --cpp_out=. $<
 
-docker: $(SERVICE)
+docker:
 	rm -rf libs/
 	mkdir libs/
-	lddcp $(SERVICE) libs/
+	lddcp service libs/
 	docker build -t $(MAINTAINER)/$(SERVICE):$(VERSION) .
 	rm -rf libs/
 
 push_local: docker
-	docker tag $(MAINTAINER)/$(SERVICE):$(VERSION) $(LOCAL_REGISTRY)/$(SERVICE):$(VERSION) 
+	docker tag $(MAINTAINER)/$(SERVICE):$(VERSION) $(LOCAL_REGISTRY)/$(SERVICE):$(VERSION)
 	docker push $(LOCAL_REGISTRY)/$(SERVICE):$(VERSION)
 
 push_cloud: docker

@@ -1,44 +1,51 @@
 #include <boost/program_options.hpp>
+#include <is/msgs/common.pb.h>
+#include <is/msgs/robot.pb.h>
 #include <is/is.hpp>
-#include "msgs/robot-controller.hpp"
-#include "task.hpp"
+// #include "task.hpp"
 
-namespace po = boost::program_options;
-using namespace std::chrono_literals;
+using namespace is::common;
+using namespace is::robot;
 
 int main(int argc, char* argv[]) {
   std::string uri;
   std::string topic;
   std::string filename;
 
-  po::options_description description("Allowed options");
-  auto&& options = description.add_options();
-  options("help,", "show available options");
-  options("uri,u", po::value<std::string>(&uri)->default_value("amqp://edge.is:30000"), "broker uri");
-  options("topic,t", po::value<std::string>(&topic)->default_value("robot-controller.0.do-task"),
+  is::po::options_description opts("Options");
+  auto&& opt_add = opts.add_options();
+
+  opt_add("help,", "show available opt_add");
+  opt_add("uri,u", is::po::value<std::string>(&uri)->default_value("amqp://rmq.is:30000"), "broker uri");
+  opt_add("topic,t", is::po::value<std::string>(&topic)->default_value("RobotController.0.SetTask"),
           "topic to request robot task");
-  options("filename,f", po::value<std::string>(&filename), "yaml file with task parameters");
+  // opt_add("filename,f", is::po::value<std::string>(&filename)->required(), "yaml file with task parameters");
 
-  po::variables_map vm;
-  po::store(po::parse_command_line(argc, argv, description), vm);
-  po::notify(vm);
+  is::parse_program_options(argc, argv, opts);
 
-  if (vm.count("help") || !vm.count("filename")) {
-    std::cout << description << std::endl;
-    return 1;
-  }
+  // auto robot_task = task::from_file(filename);
+  RobotTask robot_task;
+  robot_task.mutable_pose()->mutable_goal()->mutable_position()->set_x(1.0 /* meters */);
+  robot_task.mutable_pose()->mutable_goal()->mutable_position()->set_y(1.0 /* meters */);
+  robot_task.mutable_sampling()->set_frequency(10.0);
+  robot_task.set_allowed_error(0.2 /* meters */);
 
-  auto robot_task = task::from_file(filename);
+  robot_task.PrintDebugString();
 
-  auto is = is::connect(uri);
-  auto client = is::make_client(is);
+  is::info("Trying to connect to {}", uri);
+  auto channel = is::rmq::Channel::CreateFromUri(uri);
+  auto tag = is::declare_queue(channel);
+ 
+  auto msg = is::pack_proto(robot_task);
+  msg->ReplyTo(tag);
 
-  auto id = client.request(topic, is::msgpack(robot_task));
-  auto reply = client.receive_for(5s, id, is::policy::discard_others);
-  if (reply == nullptr) {
-    is::log::warn("Can't request task");
-  } else {
-    is::log::info("Task requested");
-  }
+  channel->BasicPublish("is", topic, msg);
+  
+  is::info("Waiting for reply");
+  auto envelope = channel->BasicConsumeMessage(tag);
+  auto status = is::rpc_status(envelope);
+
+  is::info("{} | {}", StatusCode_Name(status.code()), status.why());
+
   return 0;
 }

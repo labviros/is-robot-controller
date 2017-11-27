@@ -3,7 +3,6 @@
 
 #include <yaml-cpp/yaml.h>
 #include <armadillo>
-
 namespace YAML {
 template <>
 struct convert<arma::vec> {
