@@ -261,20 +261,20 @@ int main(int argc, char* argv[]) {
       case CONSUMING: {
         auto envelope = is::consume_until(channel, sampling_deadline);
         if (envelope == nullptr) {
-          is::info("Sampling deadline exceeded");
+          is::warn("Sampling deadline exceeded");
           state = COMPUTE_COMMAND;
           break;
         }
-        if (envelope->Message()->CorrelationIdIsSet())
-          break;
         if (envelope->ConsumerTag() == queue) {
-          messages[envelope->RoutingKey()] = envelope;
-          auto received_n = std::count_if(messages.begin(), messages.end(), [&](auto key_value) {
-            return inside_window(key_value.second, window_begin);
-          });
-          if (received_n == sources.size()) {
-            is::info("Received all messages");
-            state = COMPUTE_COMMAND;
+          if (!envelope->Message()->CorrelationIdIsSet()) {
+            messages[envelope->RoutingKey()] = envelope;
+            auto received_n = std::count_if(messages.begin(), messages.end(), [&](auto key_value) {
+              return inside_window(key_value.second, window_begin);
+            });
+            if (received_n == sources.size()) {
+              is::info("Received all messages");
+              state = COMPUTE_COMMAND;
+            }
           }
         } else {
           is::info("New task received {}", envelope->RoutingKey());
