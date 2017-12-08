@@ -103,14 +103,10 @@ RobotControllerProgress make_status(arma::vec const& current_pose, arma::vec con
 }
 
 auto none(robot::Parameters const& parameters) {
-  // auto a = parameters.center_offset;
+  auto a = parameters.center_offset;
   return [=](arma::vec const& current_pose) {
-    /*
-        return make_status(current_pose, make_control_pose(current_pose, a),
-                           std::make_tuple(arma::vec({0.0, 0.0}), make_control_pose(current_pose, a), true));
-        */
-    RobotControllerProgress progress;
-    return progress;
+    return make_status(current_pose, make_control_pose(current_pose, a),
+                       std::make_tuple(arma::vec({0.0, 0.0}), make_control_pose(current_pose, a), true));
   };
 }
 
