@@ -4,6 +4,7 @@ LDFLAGS += -L/usr/local/lib -I/usr/local/include \
 			`pkg-config --libs protobuf librabbitmq libSimpleAmqpClient`\
 			-lpthread -lboost_program_options -lboost_system -lboost_filesystem\
 			-lismsgs -larmadillo -lyaml-cpp\
+			-lprometheus-cpp  -lopentracing -lzipkin -lzipkin_opentracing \
 			-Wl,--no-as-needed -Wl,--as-needed -ldl
 PROTOC = protoc
 LOCAL_PROTOS_PATH = ./msgs/

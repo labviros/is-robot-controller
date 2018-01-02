@@ -115,7 +115,8 @@ std::ostream& operator<<(std::ostream& os, const std::vector<std::string>& vec) 
 }  // namespace std
 
 int main(int argc, char* argv[]) {
-  std::string uri;
+  std::string uri, zipkin_host;
+  uint32_t zipkin_port;
   unsigned int robot_id;
   std::vector<std::string> cameras;
   std::vector<std::string> sources;
@@ -127,6 +128,9 @@ int main(int argc, char* argv[]) {
 
   opt_add("help,", "show available options");
   opt_add("uri,u", is::po::value<std::string>(&uri)->default_value("amqp://rmq.is:30000"), "broker uri");
+  opt_add("zipkin_host,z", is::po::value<std::string>(&zipkin_host)->default_value("zipkin.default"),
+          "zipkin hostname");
+  opt_add("zipkin_port,P", is::po::value<uint32_t>(&zipkin_port)->default_value(9411), "zipkin port");
   opt_add("robot-id,r", is::po::value<unsigned int>(&robot_id)->default_value(0), "robot id");
   opt_add("cameras,c", is::po::value<std::vector<std::string>>(&cameras)->multitoken()->default_value(
                            {"CameraGateway.0", "CameraGateway.1", "CameraGateway.2", "CameraGateway.3"}),
@@ -154,6 +158,9 @@ int main(int argc, char* argv[]) {
 
   is::info("Trying to connect to {}", uri);
   auto channel = is::rmq::Channel::CreateFromUri(uri);
+
+  is::Tracer tracer(fmt::format("RobotController.{}", robot_id), zipkin_host, zipkin_port);
+  std::map<std::string /* id */, std::unique_ptr<is::ot::Span>> spans;
 
   is::ServiceProvider provider;
   provider.connect(channel);
@@ -199,7 +206,7 @@ int main(int argc, char* argv[]) {
   std::map<std::string /* id */, std::string /* routing-key*/> requested_ids;
   is::rmq::Envelope::ptr_t envelope;
 
-  auto request = [&](std::string const& endpoint, is::pb::Message const& message){
+  auto request = [&](std::string const& endpoint, is::pb::Message const& message) {
     requested_ids[is::request(channel, queue, endpoint, message)] = endpoint;
   };
 
@@ -252,7 +259,8 @@ int main(int argc, char* argv[]) {
       }
 
       case REPLY_RECEIVED: {
-        auto pos = requested_ids.find(envelope->Message()->CorrelationId());
+        auto id = envelope->Message()->CorrelationId();
+        auto pos = requested_ids.find(id);
         assert(pos != requested_ids.end());
         auto status = is::rpc_status(envelope);
         if (status.code() == StatusCode::OK)
@@ -261,6 +269,13 @@ int main(int argc, char* argv[]) {
           is::warn("[{}] {}", pos->second, status);
         if (pos->second == "Time.Sync")
           waiting_sync = false;
+        if (pos->second == fmt::format("RobotGateway.{}.SetConfig", robot_id)) {
+          auto span = spans.find(id);
+          if (span != spans.end()) {
+            span->second->Finish();
+            spans.erase(span);
+          }
+        }
         requested_ids.erase(pos);
         state = CONSUMING;
         break;
@@ -278,7 +293,21 @@ int main(int argc, char* argv[]) {
         RobotConfig robot_config;
         auto speed = controller_status.current_speed();
         *robot_config.mutable_speed() = speed;
-        request(fmt::format("RobotGateway.{}.SetConfig", robot_id), robot_config);
+        auto speed_msg = is::prepare_request(queue, robot_config);
+        auto correlation_id = speed_msg->CorrelationId();
+
+        auto last_annotation = std::max_element(annotations.begin(), annotations.end(), [](auto lhs, auto rhs) {
+          return lhs->Message()->Timestamp() < rhs->Message()->Timestamp();
+        });
+        if (last_annotation != annotations.end()) {
+          auto span = tracer.extract(*last_annotation, "control");
+          tracer.inject(speed_msg, span->context());
+          spans[correlation_id] = std::move(span);
+        }
+        
+        auto speed_endpoint = fmt::format("RobotGateway.{}.SetConfig", robot_id);
+        requested_ids[speed_msg->CorrelationId()] = speed_endpoint;
+        is::publish(channel, speed_endpoint, speed_msg);
         is::info("[Speed][{:.1f}, {:.1f}]", 1000.0 * speed.linear(), (45.0 / atan(1)) * speed.angular());
 
         is::publish(channel, fmt::format("RobotController.{}.Status", robot_id), controller_status);
