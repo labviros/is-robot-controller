@@ -2,10 +2,8 @@ CXX = clang++
 CXXFLAGS += -std=c++14
 LDFLAGS += -L/usr/local/lib -I/usr/local/include \
 			`pkg-config --libs protobuf librabbitmq libSimpleAmqpClient`\
-			-lpthread -lboost_program_options -lboost_system -lboost_filesystem\
-			-lismsgs -larmadillo -lyaml-cpp\
-			-lprometheus-cpp  -lopentracing -lzipkin -lzipkin_opentracing \
-			-Wl,--no-as-needed -Wl,--as-needed -ldl
+			-lpthread -lboost_program_options -lboost_system -lboost_filesystem -lismsgs -larmadillo \
+			-lprometheus-cpp  -lopentracing -lzipkin -lzipkin_opentracing
 PROTOC = protoc
 LOCAL_PROTOS_PATH = ./msgs/
 
@@ -25,7 +23,7 @@ debug: service
 release: CXXFLAGS += -Wall -Werror -O2
 release: service
 
-service: service.o 
+service: robot-parameters.pb.o service.o
 	$(CXX) $^ $(LDFLAGS) -o $@
 
 .PRECIOUS: %.pb.cc

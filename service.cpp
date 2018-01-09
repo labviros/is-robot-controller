@@ -8,10 +8,11 @@
 #include <is/msgs/common.pb.h>
 #include <is/msgs/image.pb.h>
 #include <is/msgs/robot.pb.h>
+#include <google/protobuf/empty.pb.h>
+#include "robot-parameters.pb.h"
 #include <is/is.hpp>
 
 #include "fence.hpp"
-#include "robot-parameters.hpp"
 #include "task.hpp"
 
 using namespace arma;
@@ -78,19 +79,6 @@ bool inside_window(is::rmq::Envelope::ptr_t const& envelope, is::pb::Timestamp c
   return ts >= reference;
 }
 
-std::string send_speed(is::rmq::Channel::ptr_t& channel, std::string const& queue, unsigned int robot_id,
-                       Speed const& speed) {
-  RobotConfig robot_config;
-  *robot_config.mutable_speed() = speed;
-  is::info("[Speed][{:.1f}, {:.1f}]", 1000.0 * speed.linear(), (45.0 / atan(1)) * speed.angular());
-  return is::request(channel, queue, fmt::format("RobotGateway.{}.SetConfig", robot_id), robot_config);
-}
-
-std::string stop_robot(is::rmq::Channel::ptr_t& channel, std::string const& queue, unsigned int robot_id) {
-  Speed speed;
-  return send_speed(channel, queue, robot_id, speed);
-}
-
 double get_period(SyncRequest const& sync_request) {
   if (sync_request.sampling().rate_case() == SamplingSettings::RateCase::kFrequency) {
     return 1.0 / sync_request.sampling().frequency();
@@ -138,13 +126,23 @@ int main(int argc, char* argv[]) {
   opt_add("sources,s", is::po::value<std::vector<std::string>>(&sources)->multitoken()->default_value(
                            {"ArUco.0", "ArUco.1", "ArUco.2", "ArUco.3"}),
           "the list of topics where this service will consume poses");
-  opt_add("parameters,p", is::po::value<std::string>(&parameters_file)->default_value("parameters.yaml"),
-          "yaml file with robot parameters");
+  opt_add("parameters,p", is::po::value<std::string>(&parameters_file)->default_value("parameters.json"),
+          "json file with robot parameters");
   opt_add("rate,R", is::po::value<float>(&rate)->default_value(5.0), "sampling rate");
 
   is::parse_program_options(argc, argv, opts);
 
-  robot::Parameters parameters(parameters_file);
+  auto maybe_parameters = is::load_from_json<Parameters>(parameters_file);
+  if (!maybe_parameters)
+    is::critical("Can't load robot parametres from file {}. Exiting", parameters_file);
+  auto parameters = *maybe_parameters;
+  is::info("Parameteres loaded: {}", parameters);
+  if (parameters.speed_limits_size() != 3)
+    is::critical("'speed_limits' parameters field must have 3 elements, contains {}", parameters.speed_limits_size());
+  if (parameters.gains_size() != 2)
+    is::critical("'gains_size' parameters field must have 2 elements, contains {}.", parameters.gains_size());
+  
+  // robot::Parameters parameters(parameters_file);
   std::function<RobotControllerProgress(arma::vec)> task = task::none(parameters);
   bool do_sync;
 
@@ -288,7 +286,7 @@ int main(int argc, char* argv[]) {
 
         current_pose = aggregate_pose(annotations.begin(), annotations.end(), robot_id);
         auto controller_status = task(current_pose);
-        *controller_status.mutable_current_speed() = fence::limit_speed(controller_status, parameters.fence);
+        *controller_status.mutable_current_speed() = fence::limit_speed(controller_status, parameters.fence());
 
         RobotConfig robot_config;
         auto speed = controller_status.current_speed();

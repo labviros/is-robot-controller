@@ -3,11 +3,10 @@
 
 #include <is/msgs/common.pb.h>
 #include <is/msgs/robot.pb.h>
-#include <yaml-cpp/yaml.h>
+#include "robot-parameters.pb.h"
 #include <armadillo>
 #include <cmath>
 #include <functional>
-#include "robot-parameters.hpp"
 
 namespace task {
 
@@ -62,7 +61,7 @@ arma::vec make_control_pose(arma::vec current_pose, double a) {
 }
 
 // returns <speed, control_pose, arrived>
-std::tuple<arma::vec, arma::vec, bool> eval_speed(robot::Parameters const& parameters, arma::vec const& current_pose,
+std::tuple<arma::vec, arma::vec, bool> eval_speed(Parameters const& parameters, arma::vec const& current_pose,
                                                   arma::vec const& desired_pose, double stop_distance,
                                                   bool stop_condition = true,
                                                   arma::vec const& trajectory_speed = arma::vec({0.0, 0.0})) {
@@ -70,9 +69,9 @@ std::tuple<arma::vec, arma::vec, bool> eval_speed(robot::Parameters const& param
     return std::make_tuple(arma::vec({0.0, 0.0}), current_pose, false);
 
   auto heading = current_pose(2);
-  auto a = parameters.center_offset;
-  auto L = parameters.L;
-  auto K = parameters.K;
+  auto a = parameters.center_offset();
+  arma::vec L({parameters.speed_limits(0), parameters.speed_limits(1)});
+  arma::vec K({parameters.gains(0), parameters.gains(1)});
   arma::vec control_pose = make_control_pose(current_pose, a);
 
   arma::vec error = desired_pose.subvec(0, 1) - control_pose.subvec(0, 1);
@@ -102,15 +101,15 @@ RobotControllerProgress make_status(arma::vec const& current_pose, arma::vec con
   return status;
 }
 
-auto none(robot::Parameters const& parameters) {
-  auto a = parameters.center_offset;
+auto none(Parameters const& parameters) {
+  auto a = parameters.center_offset();
   return [=](arma::vec const& current_pose) {
     return make_status(current_pose, make_control_pose(current_pose, a),
                        std::make_tuple(arma::vec({0.0, 0.0}), make_control_pose(current_pose, a), true));
   };
 }
 
-auto final_position(robot::Parameters const& parameters, RobotTask const& robot_task) {
+auto final_position(Parameters const& parameters, RobotTask const& robot_task) {
   auto task = robot_task.pose();
   auto desired_pose = pose_to_vec(task.goal());
   auto stop_distance = robot_task.allowed_error();
@@ -121,7 +120,7 @@ auto final_position(robot::Parameters const& parameters, RobotTask const& robot_
   };
 }
 
-auto final_heading(robot::Parameters const& parameters, RobotTask const& /*robot_task*/) {
+auto final_heading(Parameters const& parameters, RobotTask const& /*robot_task*/) {
   /*
   auto desired_heading = *(robot_task.desired_heading);
   auto stop_heading =
@@ -138,7 +137,7 @@ auto final_heading(robot::Parameters const& parameters, RobotTask const& /*robot
   return none(parameters);
 }
 
-auto trajectory(robot::Parameters const& parameters, RobotTask const& robot_task) {
+auto trajectory(Parameters const& parameters, RobotTask const& robot_task) {
   auto task = robot_task.trajectory();
 
   return [
@@ -161,7 +160,7 @@ auto trajectory(robot::Parameters const& parameters, RobotTask const& robot_task
   };
 }
 
-auto path(robot::Parameters const& parameters, RobotTask const& /*robot_task*/) {
+auto path(Parameters const& parameters, RobotTask const& /*robot_task*/) {
   /*
   auto task_positions = robot_task.positions;
   auto stop_distance = robot_task.stop_distance;
