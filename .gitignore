@@ -1,3 +1,4 @@
 service
 *.pyc
 *.o
+tests/*.json
