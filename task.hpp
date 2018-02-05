@@ -52,11 +52,11 @@ Speed vec_to_speed(arma::vec const& vec) {
 }
 
 arma::vec make_control_pose(arma::vec current_pose, double a) {
-  if (current_pose.empty())
-    return current_pose;
-  auto heading = current_pose(2);
-  current_pose(0) += a * cos(heading);
-  current_pose(1) += a * sin(heading);
+  // if (current_pose.empty())
+  //   return current_pose;
+  // auto heading = current_pose(2);
+  // current_pose(0) += a * cos(heading);
+  // current_pose(1) += a * sin(heading);
   return current_pose;
 }
 
@@ -78,7 +78,10 @@ std::tuple<arma::vec, arma::vec, bool> eval_speed(Parameters const& parameters, 
   if (stop_condition && arma::norm(error) < stop_distance)
     return std::make_tuple(arma::vec({0.0, 0.0}), control_pose, true);
   arma::mat invA = {{cos(heading), sin(heading)}, {-(1.0 / a) * sin(heading), (1.0 / a) * cos(heading)}};
-  arma::vec C = trajectory_speed + L % tanh((K / L) % error);
+  arma::vec L1 = L / 2.0;
+  arma::vec c1 = trajectory_speed;
+  arma::vec c2 = L1 % tanh((K / L1) % error);
+  arma::vec C = arma::min(c1 + c2, L);
   return std::make_tuple(invA * C, control_pose, false);
 }
 

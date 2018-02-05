@@ -1,17 +1,23 @@
-FROM git.is:5000/is-cpp:1
-
+# Build container
+FROM viros/is-cpp:1
 ARG SERVICE=local
-COPY . ${SERVICE}
-RUN cd ${SERVICE} && \
-    make clean && \
-    make release && \
-    mkdir lib && \
-    for lib in `ldd service | awk 'BEGIN{ORS=" "}$1~/^\//{print $1}$3~/^\//{print $3}' | sed 's/,$/\n/'`; do cp $lib lib/; done 
+WORKDIR /opt
+COPY . .
+RUN make release                                                \
+ && mkdir deploy                                                \
+ && mv ${SERVICE} deploy/service                                \
+ && libs=`ldd deploy/service                                    \
+    | awk 'BEGIN{ORS=" "}$1~/^\//{print $1}$3~/^\//{print $3}'  \
+    | sed 's/,$/\n/'`                                           \
+ && for lib in $libs;                                           \
+    do                                                          \  
+      dir="deploy`dirname $lib`";                               \
+      mkdir -v -p  $dir;                                        \
+      cp --verbose $lib $dir;                                   \
+    done
 
-FROM ubuntu:16.04
-ARG SERVICE=local
-COPY --from=0 ${SERVICE}/service .
-COPY --from=0 ${SERVICE}/parameters.json .
-COPY --from=0 ${SERVICE}/lib /usr/local/lib/
-RUN ldconfig
-CMD ["./service"]
+# Deployment container
+FROM scratch
+ENV LD_LIBRARY_PATH=/usr/local/lib
+COPY --from=0 /opt/deploy/ /
+CMD ["/service"]

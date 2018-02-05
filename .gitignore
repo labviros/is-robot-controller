@@ -1,4 +1,12 @@
-service
+robot-controller
 *.pyc
 *.o
 tests/*.json
+.vscode
+*.pb.cc
+*.pb.h
+tests/results/*.png
+tests/results/dc
+tests/results/local
+tests/ismsgs/*.pyc
+tests/*.tar

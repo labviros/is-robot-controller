@@ -1,9 +1,9 @@
 CXX = clang++
 CXXFLAGS += -std=c++14
 LDFLAGS += -L/usr/local/lib -I/usr/local/include \
-			`pkg-config --libs protobuf librabbitmq libSimpleAmqpClient`\
-			-lpthread -lboost_program_options -lboost_system -lboost_filesystem -lismsgs -larmadillo \
-			-lprometheus-cpp  -lopentracing -lzipkin -lzipkin_opentracing
+			-lpthread -lprotobuf -lrabbitmq -lSimpleAmqpClient \
+			-lboost_program_options -lboost_system -lboost_filesystem -larmadillo \
+			-lismsgs -lopentracing -lzipkin -lzipkin_opentracing
 PROTOC = protoc
 LOCAL_PROTOS_PATH = ./msgs/
 
@@ -12,18 +12,18 @@ vpath %.proto $(LOCAL_PROTOS_PATH)
 MAINTAINER = viros
 SERVICE = robot-controller
 VERSION = 1
-LOCAL_REGISTRY = git.is:5000
+LOCAL_REGISTRY = ninja.local:5000
 
 all: debug
 
 debug: CXXFLAGS += -g 
 debug: LDFLAGS += -fsanitize=address -fno-omit-frame-pointer
-debug: service
+debug: $(SERVICE)
 
 release: CXXFLAGS += -Wall -Werror -O2
-release: service
+release: $(SERVICE)
 
-service: robot-parameters.pb.o service.o
+$(SERVICE): robot-parameters.pb.o $(SERVICE).o
 	$(CXX) $^ $(LDFLAGS) -o $@
 
 .PRECIOUS: %.pb.cc
@@ -31,7 +31,7 @@ service: robot-parameters.pb.o service.o
 	$(PROTOC) -I $(LOCAL_PROTOS_PATH) --cpp_out=. $<
 
 clean:
-	rm -f *.o *.pb.cc *.pb.h service
+	rm -f *.o *.pb.cc *.pb.h $(SERVICE)
 
 docker: 
 	docker build -t $(MAINTAINER)/$(SERVICE):$(VERSION) --build-arg=SERVICE=$(SERVICE) .
