@@ -196,10 +196,10 @@ int main(int argc, char* argv[]) {
         is::info("New parameters received: {}", p);
         auto has_error = p.speed_limits_size() != 3 || p.gains_size() != 2;
         std::string error_msg;
-        if (parameters.speed_limits_size() != 3)
+        if (p.speed_limits_size() != 3)
           error_msg =
               fmt::format("'speed_limits' parameters field must have 3 elements, contains {}", p.speed_limits_size());
-        if (parameters.gains_size() != 2)
+        if (p.gains_size() != 2)
           error_msg = fmt::format("'gains_size' parameters field must have 2 elements, contains {}", p.gains_size());
         if (has_error) {
           is::warn("{}", error_msg);
