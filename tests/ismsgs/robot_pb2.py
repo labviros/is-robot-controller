@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='robot.proto',
   package='is.robot',
   syntax='proto3',
-  serialized_pb=_b('\n\x0brobot.proto\x12\x08is.robot\x1a\x0c\x63ommon.proto\".\n\x0bRobotConfig\x12\x1f\n\x05speed\x18\x01 \x01(\x0b\x32\x10.is.common.Speed\".\n\rFinalPoseTask\x12\x1d\n\x04goal\x18\x01 \x01(\x0b\x32\x0f.is.common.Pose\"2\n\x08PathTask\x12&\n\tpositions\x18\x01 \x03(\x0b\x32\x13.is.common.Position\"Z\n\x0eTrajectoryTask\x12&\n\tpositions\x18\x01 \x03(\x0b\x32\x13.is.common.Position\x12 \n\x06speeds\x18\x02 \x03(\x0b\x32\x10.is.common.Speed\"\xd6\x01\n\tRobotTask\x12\'\n\x04pose\x18\x01 \x01(\x0b\x32\x17.is.robot.FinalPoseTaskH\x00\x12\"\n\x04path\x18\x02 \x01(\x0b\x32\x12.is.robot.PathTaskH\x00\x12.\n\ntrajectory\x18\x03 \x01(\x0b\x32\x18.is.robot.TrajectoryTaskH\x00\x12\x15\n\rallowed_error\x18\x0e \x01(\x02\x12-\n\x08sampling\x18\x0f \x01(\x0b\x32\x1b.is.common.SamplingSettingsB\x06\n\x04Task\"\xad\x01\n\x17RobotControllerProgress\x12\'\n\rcurrent_speed\x18\x01 \x01(\x0b\x32\x10.is.common.Speed\x12%\n\x0c\x63urrent_pose\x18\x02 \x01(\x0b\x32\x0f.is.common.Pose\x12%\n\x0c\x64\x65sired_pose\x18\x03 \x01(\x0b\x32\x0f.is.common.Pose\x12\r\n\x05\x65rror\x18\x04 \x01(\x02\x12\x0c\n\x04\x64one\x18\x05 \x01(\x08\x42\x10\n\x0c\x63om.is.robotP\x01\x62\x06proto3')
+  serialized_pb=_b('\n\x0brobot.proto\x12\x08is.robot\x1a\x0c\x63ommon.proto\".\n\x0bRobotConfig\x12\x1f\n\x05speed\x18\x01 \x01(\x0b\x32\x10.is.common.Speed\".\n\rFinalPoseTask\x12\x1d\n\x04goal\x18\x01 \x01(\x0b\x32\x0f.is.common.Pose\"2\n\x08PathTask\x12&\n\tpositions\x18\x01 \x03(\x0b\x32\x13.is.common.Position\"Z\n\x0eTrajectoryTask\x12&\n\tpositions\x18\x01 \x03(\x0b\x32\x13.is.common.Position\x12 \n\x06speeds\x18\x02 \x03(\x0b\x32\x10.is.common.Speed\"\xd6\x01\n\tRobotTask\x12\'\n\x04pose\x18\x01 \x01(\x0b\x32\x17.is.robot.FinalPoseTaskH\x00\x12\"\n\x04path\x18\x02 \x01(\x0b\x32\x12.is.robot.PathTaskH\x00\x12.\n\ntrajectory\x18\x03 \x01(\x0b\x32\x18.is.robot.TrajectoryTaskH\x00\x12\x15\n\rallowed_error\x18\x0e \x01(\x02\x12-\n\x08sampling\x18\x0f \x01(\x0b\x32\x1b.is.common.SamplingSettingsB\x06\n\x04Task\"\xbe\x01\n\x17RobotControllerProgress\x12\'\n\rcurrent_speed\x18\x01 \x01(\x0b\x32\x10.is.common.Speed\x12%\n\x0c\x63urrent_pose\x18\x02 \x01(\x0b\x32\x0f.is.common.Pose\x12%\n\x0c\x64\x65sired_pose\x18\x03 \x01(\x0b\x32\x0f.is.common.Pose\x12\r\n\x05\x65rror\x18\x04 \x01(\x02\x12\x0c\n\x04\x64one\x18\x05 \x01(\x08\x12\x0f\n\x07sources\x18\x06 \x01(\x05\x42\x10\n\x0c\x63om.is.robotP\x01\x62\x06proto3')
   ,
   dependencies=[common__pb2.DESCRIPTOR,])
 
@@ -262,6 +262,13 @@ _ROBOTCONTROLLERPROGRESS = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='sources', full_name='is.robot.RobotControllerProgress.sources', index=5,
+      number=6, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -275,7 +282,7 @@ _ROBOTCONTROLLERPROGRESS = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=497,
-  serialized_end=670,
+  serialized_end=687,
 )
 
 _ROBOTCONFIG.fields_by_name['speed'].message_type = common__pb2._SPEED

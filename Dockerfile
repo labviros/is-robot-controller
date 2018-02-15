@@ -5,6 +5,7 @@ WORKDIR /opt
 COPY . .
 RUN make release                                                \
  && mkdir deploy                                                \
+ && cp parameters.json deploy/                                  \
  && mv ${SERVICE} deploy/service                                \
  && libs=`ldd deploy/service                                    \
     | awk 'BEGIN{ORS=" "}$1~/^\//{print $1}$3~/^\//{print $3}'  \
@@ -18,6 +19,7 @@ RUN make release                                                \
 
 # Deployment container
 FROM scratch
+WORKDIR /
 ENV LD_LIBRARY_PATH=/usr/local/lib
 COPY --from=0 /opt/deploy/ /
 CMD ["/service"]

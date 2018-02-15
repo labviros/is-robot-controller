@@ -1,0 +1,33 @@
+{
+    "type": "eight_trajectory",
+    "sampling_rate": 10.0,
+    "allowed_error": 0.1,
+    "lap_time": 25.0,
+    "laps": 3,
+    "center": {
+        "x": 0.0,
+        "y": 0.0
+    },
+    "shape": {
+        "x-axis": 4.0,
+        "y-axis": 1.2
+    },
+    "robot_parameters": {
+        "center_offset": 0.2,
+        "speed_limits": [
+            0.450,
+            0.450,
+            0.785398163
+        ],
+        "gains": [
+            1.0,
+            1.0
+        ],
+        "fence": {
+            "x_min": -2.8,
+            "x_max": 2.5,
+            "y_min": -1.2,
+            "y_max": 1.2
+        }
+    }
+}
