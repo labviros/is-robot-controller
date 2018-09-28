@@ -1,6 +1,2 @@
-robot-controller
-*.pyc
-*.o
+build
 .vscode
-*.pb.cc
-*.pb.h

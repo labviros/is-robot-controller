@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+import "is/msgs/validate.proto";
+
+package is;
+
+message Fence {
+    float x_min = 1;
+    float x_max = 2;
+    float y_min = 3;
+    float y_max = 4;
+}
+
+message ControllerParameters {
+  float center_offset = 1; // robot center offset in meters that represents point of control
+  repeated float speed_limits = 2; // (x, y, w) [m/s, m/s, rad/s]
+  repeated float gains = 3; // [kx, ky]
+  Fence fence = 4;
+}
+
+message RobotControllerOptions {
+  string broker_uri = 1;
+  string zipkin_uri = 2;
+  ControllerParameters parameters = 3;  
+}

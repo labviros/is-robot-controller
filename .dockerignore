@@ -1,2 +1,2 @@
-robot-controller
-*.o
+build/
+.vscode
