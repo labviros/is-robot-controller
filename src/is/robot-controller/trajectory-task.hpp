@@ -16,18 +16,18 @@ class TrajectoryTask : public ControlTask {
   std::chrono::system_clock::time_point start;
 
  public:
-  TrajectoryTask();
+  TrajectoryTask(is::robot::RobotTask const&);
 
   void update(is::common::Pose const& pose);
 
-  auto done() override const -> bool;
-  auto error(is::common::Pose const& pose) override const -> double;
-  auto target_position() override const -> is::common::Position const&;
-  auto target_speed() override const -> is::common::Speed const&;
-  auto rate() override const -> double;
+  auto done() const -> bool override;
+  auto error(is::common::Pose const& pose) const -> double override;
+  auto target_pose() const -> is::common::Pose override;
+  auto target_speed() const -> is::common::Speed override;
+  auto rate() const -> double override;
 };
 
-TrajectoryTask::TrajectoryTask() {
+TrajectoryTask::TrajectoryTask(is::robot::RobotTask const& task) {
   target = 0;
 
   positions = std::vector<is::common::Position>{task.trajectory().positions().begin(),
@@ -43,7 +43,7 @@ TrajectoryTask::TrajectoryTask() {
   start = std::chrono::system_clock::now();
 }
 
-auto TrajectoryTask::done() override const -> bool {
+auto TrajectoryTask::done() const -> bool {
   return target == positions.size();
 }
 
@@ -57,7 +57,7 @@ void TrajectoryTask::update(is::common::Pose const& pose) {
   if (distance < allowed_error) { ++target; }
 }
 
-auto TrajectoryTask::error(is::common::Pose const& pose) override const -> double {
+auto TrajectoryTask::error(is::common::Pose const& pose) const -> double {
   auto error = 0.0;
   if (!done()) {
     auto D = Eigen::VectorXd{2};
@@ -67,13 +67,17 @@ auto TrajectoryTask::error(is::common::Pose const& pose) override const -> doubl
   return error;
 }
 
-auto TrajectoryTask::target_position() override const -> is::common::Position const& {
-  return positions.at(target);
+auto TrajectoryTask::target_pose() const -> is::common::Pose {
+  auto pose = is::common::Pose{};
+  *pose.mutable_position() = positions.at(target);
+  return pose;
 }
-auto TrajectoryTask::target_speed() override const -> is::common::Speed const& {
+
+auto TrajectoryTask::target_speed() const -> is::common::Speed {
   return speeds.at(target);
 }
-auto TrajectoryTask::rate() override const -> double {
+
+auto TrajectoryTask::rate() const -> double {
   return frequency;
 }
 

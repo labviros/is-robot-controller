@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 import "is/msgs/validate.proto";
+import "google/protobuf/duration.proto";
 
 package is;
 
@@ -12,14 +13,23 @@ message Fence {
 }
 
 message ControllerParameters {
-  float center_offset = 1; // robot center offset in meters that represents point of control
-  repeated float speed_limits = 2; // (x, y, w) [m/s, m/s, rad/s]
-  repeated float gains = 3; // [kx, ky]
+  // Offset from the robot center in meters that is going to be used as the controlled point.
+  float center_offset = 1;
+  // Robot max speed values (vx, vy, w) [m/s, m/s, rad/s].
+  repeated float speed_limits = 2;
+  // Controller gains [kx, ky].
+  repeated float gains = 3;
   Fence fence = 4;
+  /* The maximum duration that we are allowed to continue controlling the robot without receving 
+     a pose measurement. */
+  google.protobuf.Duration allowed_measurement_disruption  = 5;
 }
 
 message RobotControllerOptions {
   string broker_uri = 1;
   string zipkin_uri = 2;
-  ControllerParameters parameters = 3;  
+  int32 robot_id = 3;
+  int32 robot_frame_id = 4;
+  int32 world_frame_id = 5;
+  ControllerParameters parameters = 6;  
 }

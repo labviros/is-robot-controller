@@ -1,19 +1,25 @@
 {
-    "broker_uri": "amqp://192.168.1.105:30000",
+    "broker_uri": "amqp://localhost",
     "zipkin_uri": "http://192.168.1.105:30200",
-    "center_offset": 0.2,
-    "speed_limits": [
-        0.450,
-        0.785398163
-    ],
-    "gains": [
-        1.0,
-        1.0
-    ],
-    "fence": {
-        "x_min": -2.8,
-        "x_max": 2.5,
-        "y_min": -1.2,
-        "y_max": 1.2
+    "robot_id": 0,
+    "robot_frame_id": 100,
+    "world_frame_id": 1000,
+    "parameters": {
+        "center_offset": 0.2,
+        "speed_limits": [
+            0.450,
+            0.785398163
+        ],
+        "gains": [
+            1.0,
+            1.0
+        ],
+        "fence": {
+            "x_min": -2.8,
+            "x_max": 2.5,
+            "y_min": -1.2,
+            "y_max": 1.2
+        },
+        "allowed_measurement_disruption": "0.5s"
     }
 }
