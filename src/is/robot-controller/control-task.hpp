@@ -7,8 +7,7 @@ namespace is {
 
 class ControlTask {
  public:
-  ControlTask() = default;
-  virtual ~ControlTask() {}
+  virtual ~ControlTask() = default;
 
   virtual auto done() const -> bool = 0;
   virtual auto error(is::common::Pose const&) const -> double = 0;

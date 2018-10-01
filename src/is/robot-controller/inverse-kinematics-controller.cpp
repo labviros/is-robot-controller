@@ -1,39 +1,19 @@
-#pragma once
 
-#include <is/msgs/robot.pb.h>
+#include "inverse-kinematics-controller.hpp"
 #include <Eigen/Dense>
-#include <is/msgs/timestamp.hpp>
-#include "conf/options.pb.h"
-#include "control-task.hpp"
-#include "pose-estimation.hpp"
-#include "trajectory-task.hpp"
+#include <is/msgs/utils.hpp>
 
 namespace is {
 
-class RobotController {
-  int robot_id;
-  PoseEstimation* estimator;
-  ControllerParameters parameters;
-  std::unique_ptr<ControlTask> task;
-  std::chrono::system_clock::time_point next_deadline;
-
- public:
-  RobotController(int id, is::PoseEstimation*, is::ControllerParameters const&);
-
-  auto compute_control_action() -> is::robot::RobotControllerProgress;
-  void set_task(is::robot::RobotTask const& task);
-  auto run(is::Channel const&) -> std::chrono::system_clock::time_point;
-};
-
-RobotController::RobotController(int id, is::PoseEstimation* est,
-                                 is::ControllerParameters const& params)
-    : robot_id(id),
+InverseKinematicsController::InverseKinematicsController(is::ControllerParameters const& params,
+                                                         is::PoseEstimation* est)
+    : parameters(params),
       estimator(est),
-      parameters(params),
       task(nullptr),
-      next_deadline(std::chrono::system_clock::now()) {}
+      next_deadline(std::chrono::system_clock::now()),
+      last_cid(0) {}
 
-auto RobotController::compute_control_action() -> is::robot::RobotControllerProgress {
+auto InverseKinematicsController::compute_control_action() -> is::robot::RobotControllerProgress {
   auto progress = is::robot::RobotControllerProgress{};
 
   auto have_task = task != nullptr && !task->done();
@@ -45,10 +25,10 @@ auto RobotController::compute_control_action() -> is::robot::RobotControllerProg
     auto speed_limits = Eigen::VectorXd{2};
     auto inverse_kinematics = Eigen::MatrixXd{2, 2};
 
+    auto offset = parameters.center_offset();
     auto current_pose = estimator->pose();
     auto error = task->error(current_pose);
     auto heading = current_pose.orientation().roll();
-    auto offset = parameters.center_offset();
 
     gains << parameters.gains(0), parameters.gains(1);
     speed_limits << parameters.speed_limits(0), parameters.speed_limits(1);
@@ -74,7 +54,7 @@ auto RobotController::compute_control_action() -> is::robot::RobotControllerProg
   return progress;
 }
 
-void RobotController::set_task(is::robot::RobotTask const& new_task) {
+void InverseKinematicsController::set_task(is::robot::RobotTask const& new_task) {
   if (!new_task.has_sampling() || !new_task.sampling().has_frequency() ||
       new_task.sampling().frequency().value() < 1) {
     throw std::runtime_error{"Trajectory sampling rate required but not specified or too low"};
@@ -89,23 +69,42 @@ void RobotController::set_task(is::robot::RobotTask const& new_task) {
   }
 }
 
-auto RobotController::run(is::Channel const& channel) -> std::chrono::system_clock::time_point {
+auto InverseKinematicsController::run(is::Channel const& channel,
+                                      is::Subscription const& subscription,
+                                      boost::optional<is::Message> const& message)
+    -> std::chrono::system_clock::time_point {
+  auto is_reply =
+      message && message->topic() == subscription.name() && message->correlation_id() == last_cid;
+  if (is_reply) {
+    last_cid = 0;
+    if (message->status().ok()) {
+      estimator->set_speed(last_speed);
+    } else {
+      is::warn("event=Controller.SetConfigFailed");
+    }
+  }
   if (std::chrono::system_clock::now() >= next_deadline) {
     auto rate = task != nullptr ? task->rate() : 5;
     next_deadline += std::chrono::microseconds(static_cast<int>(1e6 / rate));
 
     auto progress = compute_control_action();
-    is::info("event=ControlLoop progress={}", progress);
+    is::info("event=Controller progress={}", progress);
 
     auto config = is::robot::RobotConfig{};
     *config.mutable_speed() = progress.current_speed();
     auto config_message = is::Message{config};
-    channel.publish(fmt::format("RobotGateway.{}.SetConfig", robot_id), config_message);
+    config_message.set_reply_to(subscription);
+    channel.publish(fmt::format("RobotGateway.{}.SetConfig", parameters.robot_id()),
+                    config_message);
 
     auto progress_message = is::Message{progress};
-    channel.publish(fmt::format("RobotGateway.{}.Progress", robot_id), progress_message);
+    channel.publish(fmt::format("RobotGateway.{}.Progress", parameters.robot_id()),
+                    progress_message);
 
-    estimator->set_speed(progress.current_speed());
+    auto no_reply_received = last_cid != 0;
+    if (no_reply_received) { is::warn("event=Controller.NoReply"); }
+    last_cid = config_message.correlation_id();
+    last_speed = progress.current_speed();
   }
   return next_deadline;
 }

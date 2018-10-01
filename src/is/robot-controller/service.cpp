@@ -6,8 +6,8 @@
 #include <is/wire/rpc.hpp>
 #include <is/wire/rpc/log-interceptor.hpp>
 #include "conf/options.pb.h"
+#include "inverse-kinematics-controller.hpp"
 #include "pose-estimation.hpp"
-#include "robot-controller.hpp"
 #include "subscription-manager.hpp"
 
 auto load_configuration(int argc, char** argv) -> is::RobotControllerOptions {
@@ -30,10 +30,11 @@ int main(int argc, char** argv) {
   auto subscription_manager =
       is::SubscriptionManager{subscription, options.robot_frame_id(), options.world_frame_id()};
   auto estimator = is::PoseEstimation{};
-  auto controller = is::RobotController{options.robot_id(), &estimator, options.parameters()};
+  auto controller = is::InverseKinematicsController{options.parameters(), &estimator};
 
   service.delegate<is::robot::RobotTask, google::protobuf::Empty>(
-      "RobotController.{}.SetTask", [&](auto* ctx, auto const& request, auto* reply) {
+      fmt::format("RobotController.{}.SetTask", options.parameters().robot_id()),
+      [&](auto* ctx, auto const& request, auto* reply) {
         controller.set_task(request);
         return is::make_status();
       });
@@ -46,6 +47,6 @@ int main(int argc, char** argv) {
       estimator.run(*maybe_message);
       service.serve(*maybe_message);
     }
-    next_control_deadline = controller.run(channel);
+    next_control_deadline = controller.run(channel, subscription, maybe_message);
   }
 }

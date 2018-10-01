@@ -13,11 +13,16 @@ add_executable(service.bin
   "service.cpp"
   ${options_src}
   ${options_hdr}
-  "ekf.hpp"
+  "extended-kalman-filter.hpp"
+  "extended-kalman-filter.cpp"
   "pose-estimation.hpp"
-  "robot-controller.hpp"
+  "pose-estimation.cpp"
+  "inverse-kinematics-controller.hpp"
+  "inverse-kinematics-controller.cpp"
   "subscription-manager.hpp"
+  "subscription-manager.cpp"
   "trajectory-task.hpp"
+  "trajectory-task.cpp"
   "control-task.hpp"
 )
 
