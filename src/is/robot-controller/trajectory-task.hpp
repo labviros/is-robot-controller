@@ -19,10 +19,9 @@ class TrajectoryTask : public ControlTask {
  public:
   TrajectoryTask(is::robot::RobotTask const&);
 
-  void update(is::common::Pose const& pose);
-
+  void update(is::common::Pose const&);
   auto done() const -> bool override;
-  auto error(is::common::Pose const& pose) const -> double override;
+  auto error(is::common::Pose const&) const -> double override;
   auto target_pose() const -> is::common::Pose override;
   auto target_speed() const -> is::common::Speed override;
   auto rate() const -> double override;

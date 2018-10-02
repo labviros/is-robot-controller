@@ -9,6 +9,7 @@ class ControlTask {
  public:
   virtual ~ControlTask() = default;
 
+  virtual void update(is::common::Pose const&) = 0;
   virtual auto done() const -> bool = 0;
   virtual auto error(is::common::Pose const&) const -> double = 0;
   virtual auto target_pose() const -> is::common::Pose = 0;

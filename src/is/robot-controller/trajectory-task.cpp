@@ -1,6 +1,6 @@
 
 #include "trajectory-task.hpp"
-
+#include <is/wire/core/logger.hpp>
 namespace is {
 
 TrajectoryTask::TrajectoryTask(is::robot::RobotTask const& task) {
@@ -24,13 +24,12 @@ auto TrajectoryTask::done() const -> bool {
 }
 
 void TrajectoryTask::update(is::common::Pose const& pose) {
-  if (done()) { return; }
-
-  auto x = positions[target].x() - pose.position().x();
-  auto y = positions[target].y() - pose.position().y();
-  auto distance = std::sqrt(x * x + y * y);
-
-  if (distance < allowed_error) { ++target; }
+  is::info("event=TrajectoryTask.Next progress={}/{}", target, positions.size());
+  if (target == positions.size() - 1) {
+    if (error(pose) <= allowed_error) { ++target; }
+  } else {
+    ++target;
+  }
 }
 
 auto TrajectoryTask::error(is::common::Pose const& pose) const -> double {
