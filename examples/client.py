@@ -45,12 +45,12 @@ def final_position(target, rate):
     return task
 
 
-with open("../options.json") as f:
+with open("../etc/conf/options.json") as f:
     options = json.load(f)
 
 channel = Channel(options["broker_uri"])
 subscription = Subscription(channel)
-task = lemniscate_of_bernoulli(shape=(4, 1), center=(0, 0), rate=10, lap_time=25)
+task = lemniscate_of_bernoulli(shape=(4, 1), center=(0, 0), rate=10, lap_time=20)
 #task = final_position(target=(0, 0), rate=10)
 task.allowed_error = 0.15
 message = Message(content=task, reply_to=subscription)
