@@ -17,6 +17,7 @@ class InverseKinematicsController {
   std::chrono::system_clock::time_point next_deadline;
   uint64_t last_cid;
   is::common::Speed last_speed;
+  std::vector<std::string> sources;
 
  public:
   InverseKinematicsController(is::ControllerParameters const&, is::PoseEstimation*);
@@ -25,6 +26,7 @@ class InverseKinematicsController {
   void set_task(is::robot::RobotTask const& task);
   auto run(is::Channel const&, is::Subscription const&, boost::optional<is::Message> const&)
       -> std::chrono::system_clock::time_point;
+
 };
 
 }  // namespace is

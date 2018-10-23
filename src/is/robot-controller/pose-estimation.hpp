@@ -23,6 +23,9 @@ class PoseEstimation {
   auto time_since_last_observation() const -> std::chrono::microseconds;
 
   void run(is::Message const& message);
+
+ public:
+  std::function<void(std::string const&)> on_new_measurement;
 };
 
 }  // namespace is

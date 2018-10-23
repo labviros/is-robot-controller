@@ -11,7 +11,9 @@ InverseKinematicsController::InverseKinematicsController(is::ControllerParameter
       estimator(est),
       task(nullptr),
       next_deadline(std::chrono::system_clock::now()),
-      last_cid(0) {}
+      last_cid(0) {
+  estimator->on_new_measurement = [&](auto const& topic) { sources.push_back(topic); };
+}
 
 auto InverseKinematicsController::compute_control_action() -> is::robot::RobotControllerProgress {
   auto progress = is::robot::RobotControllerProgress{};
@@ -61,8 +63,7 @@ auto InverseKinematicsController::compute_control_action() -> is::robot::RobotCo
 }
 
 void InverseKinematicsController::set_task(is::robot::RobotTask const& new_task) {
-  if (!new_task.has_sampling() || !new_task.sampling().has_frequency() ||
-      new_task.sampling().frequency().value() < 1) {
+  if (new_task.rate() < 1) {
     throw std::runtime_error{"Trajectory sampling rate required but not specified or too low"};
   }
 
@@ -103,6 +104,14 @@ auto InverseKinematicsController::run(is::Channel const& channel,
     config_message.set_reply_to(subscription);
     channel.publish(fmt::format("RobotGateway.{}.SetConfig", parameters.robot_id()),
                     config_message);
+
+    if (task != nullptr) {
+      *progress.mutable_begin() = to_timestamp(task->began_at());
+      if (task->done()) { *progress.mutable_end() = to_timestamp(task->ended_at()); }
+      progress.set_completion(task->completion());
+      for (auto const& s : sources) { *progress.mutable_sources()->Add() = s; }
+    }
+    sources.clear();
 
     auto progress_message = is::Message{progress};
     channel.publish(fmt::format("RobotController.{}.Progress", parameters.robot_id()),

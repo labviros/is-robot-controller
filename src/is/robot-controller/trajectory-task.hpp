@@ -15,16 +15,24 @@ class TrajectoryTask : public ControlTask {
   double allowed_error;
   double frequency;
   std::chrono::system_clock::time_point start;
+  std::chrono::system_clock::time_point end;
 
  public:
   TrajectoryTask(is::robot::RobotTask const&);
 
-  void update(is::common::Pose const&);
+  auto rate() const -> double override;
+
   auto done() const -> bool override;
+  auto completion() const -> double override;
+
+  void update(is::common::Pose const&);
   auto error(is::common::Pose const&) const -> double override;
+
   auto target_pose() const -> is::common::Pose override;
   auto target_speed() const -> is::common::Speed override;
-  auto rate() const -> double override;
+
+  auto began_at() const -> std::chrono::system_clock::time_point override;
+  auto ended_at() const -> std::chrono::system_clock::time_point override;
 };
 
 }  // namespace is

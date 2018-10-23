@@ -15,7 +15,7 @@ TrajectoryTask::TrajectoryTask(is::robot::RobotTask const& task) {
   }
 
   allowed_error = task.allowed_error();
-  frequency = task.sampling().frequency().value();
+  frequency = task.rate();
   start = std::chrono::system_clock::now();
 }
 
@@ -23,12 +23,21 @@ auto TrajectoryTask::done() const -> bool {
   return target == positions.size();
 }
 
+auto TrajectoryTask::completion() const -> double {
+  return target / static_cast<double>(positions.size());
+}
+
 void TrajectoryTask::update(is::common::Pose const& pose) {
-  is::info("event=TrajectoryTask.Next progress={}/{}", target, positions.size());
-  if (target == positions.size() - 1) {
-    if (error(pose) <= allowed_error) { ++target; }
-  } else {
-    ++target;
+  if (!done()) {
+    is::info("event=TrajectoryTask.Next progress={}/{}", target, positions.size());
+    if (target == positions.size() - 1) {
+      if (error(pose) <= allowed_error) {
+        ++target;
+        end = std::chrono::system_clock::now();
+      }
+    } else {
+      ++target;
+    }
   }
 }
 
@@ -54,6 +63,14 @@ auto TrajectoryTask::target_speed() const -> is::common::Speed {
 
 auto TrajectoryTask::rate() const -> double {
   return frequency;
+}
+
+auto TrajectoryTask::began_at() const -> std::chrono::system_clock::time_point {
+  return start;
+}
+
+auto TrajectoryTask::ended_at() const -> std::chrono::system_clock::time_point {
+  return end;
 }
 
 }  // namespace is

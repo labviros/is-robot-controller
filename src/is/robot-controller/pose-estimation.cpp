@@ -101,6 +101,8 @@ void PoseEstimation::run(is::Message const& message) {
   kf.predict(speed);
   auto pose = kf.correct(measurement);
 
+  on_new_measurement(message.topic());
+
   is::info("event=PoseEstimation.NewPose topic={} x={} y={} phi={}", message.topic(), pose(0),
            pose(1), 180 * pose(2) / 3.14);
 }
