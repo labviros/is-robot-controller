@@ -5,6 +5,7 @@
 
 namespace is {
 
+/* Interface for control tasks. */
 class ControlTask {
  public:
   virtual ~ControlTask() = default;

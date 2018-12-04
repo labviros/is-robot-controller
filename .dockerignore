@@ -1,2 +1,6 @@
-build/
-.vscode
+**
+
+!build.sh
+!conanfile.py
+!CMakeLists.txt
+!src/**
