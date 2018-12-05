@@ -20,9 +20,14 @@ message ControllerParameters {
 }
 
 message RobotControllerOptions {
+  // URI of the amqp broker.
   string broker_uri = 1;
+  // URI of the zipkin server.
   string zipkin_uri = 2;
+  // ID of the frame of reference of the robot base.
   int32 robot_frame_id = 4;
+  // ID of the frame of reference of the world. 
   int32 world_frame_id = 5;
-  ControllerParameters parameters = 6;  
+  //
+  ControllerParameters parameters = 6;
 }

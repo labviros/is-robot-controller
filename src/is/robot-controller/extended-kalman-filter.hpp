@@ -11,6 +11,7 @@ using JacobianMatrix = Eigen::MatrixXd;
 
 namespace is {
 
+/* Simple extended kalman filter implementation. */
 struct ExtendedKalmanFilter {
   Eigen::VectorXd mean_prior;
   Eigen::MatrixXd system_noise_covariance;
