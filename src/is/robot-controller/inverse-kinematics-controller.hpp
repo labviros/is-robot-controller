@@ -6,7 +6,7 @@
 #include "conf/options.pb.h"
 #include "control-task.hpp"
 #include "pose-estimation.hpp"
-#include "trajectory-task.hpp"
+#include "basic-move-task.hpp"
 
 namespace is {
 
@@ -18,6 +18,7 @@ class InverseKinematicsController {
   ControllerParameters parameters;
   PoseEstimation* estimator;
   std::unique_ptr<ControlTask> task;
+  int64_t task_id;
   std::chrono::system_clock::time_point next_deadline;
   uint64_t last_cid;
   is::common::Speed last_speed;
@@ -27,12 +28,9 @@ class InverseKinematicsController {
   InverseKinematicsController(is::ControllerParameters const&, is::PoseEstimation*);
 
   auto compute_control_action() -> is::robot::RobotControllerProgress;
-  void set_task(is::robot::RobotTask const& task);
-
-  // Periodically computes the velocity command and send it to the robot as a RPC.
+  auto set_task(is::robot::RobotTaskRequest const& task) -> uint64_t;
   auto run(is::Channel const&, is::Subscription const&, boost::optional<is::Message> const&)
       -> std::chrono::system_clock::time_point;
-
 };
 
 }  // namespace is

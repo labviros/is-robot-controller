@@ -2,6 +2,8 @@
 #include "inverse-kinematics-controller.hpp"
 #include <Eigen/Dense>
 #include <is/msgs/utils.hpp>
+#include <limits>
+#include <random>
 
 namespace is {
 
@@ -62,18 +64,23 @@ auto InverseKinematicsController::compute_control_action() -> is::robot::RobotCo
   return progress;
 }
 
-void InverseKinematicsController::set_task(is::robot::RobotTask const& new_task) {
-  if (new_task.rate() < 1) {
-    throw std::runtime_error{"Trajectory sampling rate required but not specified or too low"};
-  }
-
-  if (new_task.has_trajectory()) {
-    task = std::make_unique<TrajectoryTask>(new_task);
-  } else if (new_task.has_path()) {
-  } else if (new_task.has_pose()) {
+auto InverseKinematicsController::set_task(is::robot::RobotTaskRequest const& new_task)
+    -> uint64_t {
+  if (new_task.has_basic_move_task()) {
+    task = std::make_unique<BasicMoveTask>(new_task.basic_move_task());
   } else {
     throw std::runtime_error{"Atleast one task must be specified"};
   }
+
+  auto make_random_uid = []() -> uint64_t {
+    static std::mt19937_64 engine(std::random_device{}());
+    static std::uniform_int_distribution<uint64_t> distribution(
+        1, std::numeric_limits<uint64_t>::max());
+    return distribution(engine);
+  };
+
+  task_id = new_task.id() != 0 ? new_task.id() : make_random_uid();
+  return task_id;
 }
 
 auto InverseKinematicsController::run(is::Channel const& channel,
@@ -106,17 +113,18 @@ auto InverseKinematicsController::run(is::Channel const& channel,
                     config_message);
 
     if (task != nullptr) {
+      progress.set_id(task_id);
       *progress.mutable_begin() = to_timestamp(task->began_at());
       if (task->done()) { *progress.mutable_end() = to_timestamp(task->ended_at()); }
       progress.set_completion(task->completion());
       for (auto const& s : sources) { *progress.mutable_sources()->Add() = s; }
     }
-    sources.clear();
 
     auto progress_message = is::Message{progress};
     channel.publish(fmt::format("RobotController.{}.Progress", parameters.robot_id()),
                     progress_message);
 
+    sources.clear();
     auto no_reply_received = last_cid != 0;
     if (no_reply_received) { is::warn("event=Controller.NoReply"); }
     last_cid = config_message.correlation_id();

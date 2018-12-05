@@ -1,4 +1,4 @@
-is-msgs==1.1.9
+is-msgs==1.1.10
 is-wire==1.1.3
 sympy==1.3
 numpy==1.15.2

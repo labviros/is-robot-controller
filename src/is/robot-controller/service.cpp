@@ -32,10 +32,10 @@ int main(int argc, char** argv) {
   auto estimator = is::PoseEstimation{};
   auto controller = is::InverseKinematicsController{options.parameters(), &estimator};
 
-  service.delegate<is::robot::RobotTask, google::protobuf::Empty>(
+  service.delegate<is::robot::RobotTaskRequest, is::robot::RobotTaskReply>(
       fmt::format("RobotController.{}.SetTask", options.parameters().robot_id()),
       [&](auto* ctx, auto const& request, auto* reply) {
-        controller.set_task(request);
+        reply->set_id(controller.set_task(request));
         return is::make_status();
       });
 

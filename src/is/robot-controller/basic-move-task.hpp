@@ -8,7 +8,7 @@
 
 namespace is {
 
-class TrajectoryTask : public ControlTask {
+class BasicMoveTask : public ControlTask {
   int target;
   std::vector<is::common::Position> positions;
   std::vector<is::common::Speed> speeds;
@@ -18,7 +18,7 @@ class TrajectoryTask : public ControlTask {
   std::chrono::system_clock::time_point end;
 
  public:
-  TrajectoryTask(is::robot::RobotTask const&);
+  BasicMoveTask(is::robot::BasicMoveTask const&);
 
   auto rate() const -> double override;
 

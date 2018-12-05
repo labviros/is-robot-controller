@@ -22,8 +22,8 @@ add_executable(service.bin
   "inverse-kinematics-controller.cpp"
   "subscription-manager.hpp"
   "subscription-manager.cpp"
-  "trajectory-task.hpp"
-  "trajectory-task.cpp"
+  "basic-move-task.hpp"
+  "basic-move-task.cpp"
   "control-task.hpp"
 )
 

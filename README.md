@@ -14,12 +14,14 @@ This service depends on the following services:
 
 Events:
 --------
-⇒ Triggered By | Triggers ⇒ | Description  
------------- | -------- | -----------
-:incoming_envelope: **topic:** `RobotController.{robot_id}.SetTask` <br> :gem: **schema:** [RobotTask] | :incoming_envelope: **topic:** `{request.reply_to}` <br> :gem: **schema:** Empty | `Configure the current task to be executed.`
-:clock5: **interval:** {RobotTask.rate} | :incoming_envelope: **topic:** `RobotController.{robot_id}.Status` <br> :gem: **schema:** [RobotControllerProgress] | `Periodically publishes the progress of the current task being executed. The period is determined by the task sampling rate.`
+<img width=1000/> ⇒ Triggered By | <img width=1000/> Triggers ⇒ | <img width=200/> Description  
+:------------ | :-------- | :----------
+:incoming_envelope: **topic:** `RobotController.{robot_id}.SetTask` <br> :gem: **schema:** [RobotTaskRequest] | :incoming_envelope: **topic:** `{request.reply_to}` <br> :gem: **schema:** [RobotTaskReply] | `Configure the current task to be executed.`
+:clock5: **interval:** `{RobotTask.rate}` | :incoming_envelope: **topic:** `RobotController.{robot_id}.Status` <br> :gem: **schema:** [RobotControllerProgress] | `Periodically publishes the progress of the current task being executed. The period is determined by the task sampling rate.`
 
-[RobotTask]: https://github.com/labviros/is-msgs/tree/master/docs#is.robot.RobotTask
+
+[RobotTaskRequest]: https://github.com/labviros/is-msgs/tree/master/docs#is.robot.RobotTaskRequest
+[RobotTaskReply]: https://github.com/labviros/is-msgs/tree/master/docs#is.robot.RobotTaskReply
 [RobotControllerProgress]: https://github.com/labviros/is-msgs/tree/master/docs#is.robot.RobotControllerProgress
 
 
