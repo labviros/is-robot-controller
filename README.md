@@ -12,10 +12,22 @@ This service depends on the following services:
 * [is-robots](https://github.com/labviros/is-robots): This service expects the robot to have a gateway compliant with the standard API. Particularly, it expects the robot to have **RobotGateway.{robot_id}.SetConfig** implemented.
 
 
-RPCs
-------
-| Service | Request | Reply | Description | 
-| ------- | ------- | ------| ----------- |
-| RobotController.{robot_id}.SetTask | [RobotTask] | Empty | Configure the current task to be executed. |
+Events:
+--------
+⇒ Triggered By | Triggers ⇒ | Description  
+------------ | -------- | -----------
+:incoming_envelope: **topic:** `RobotController.{robot_id}.SetTask` <br> :gem: **schema:** [RobotTask] | :incoming_envelope: **topic:** `{request.reply_to}` <br> :gem: **schema:** Empty | `Configure the current task to be executed.`
+:clock5: **interval:** {RobotTask.rate} | :incoming_envelope: **topic:** `RobotController.{robot_id}.Status` <br> :gem: **schema:** [RobotControllerProgress] | `Periodically publishes the progress of the current task being executed. The period is determined by the task sampling rate.`
 
 [RobotTask]: https://github.com/labviros/is-msgs/tree/master/docs#is.robot.RobotTask
+[RobotControllerProgress]: https://github.com/labviros/is-msgs/tree/master/docs#is.robot.RobotControllerProgress
+
+
+Configuration:
+----------------
+The behavior of the service can be customized by passing a JSON configuration file as the first argument, e.g: `./service config.json`. The schema and documentation for this file can be found in [`src/is/robot-controller/conf/options.proto`](src/is/robot-controller/conf/options.proto). An example configuration file can be found in [`etc/conf/options.json`](etc/conf/options.json).
+
+
+Examples:
+------------
+An example on how to configure a task and then watch its progress is provided by the python script in [`examples/client.py`](examples/client.py).
