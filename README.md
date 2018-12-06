@@ -17,7 +17,7 @@ Events:
 <img width=1000/> ⇒ Triggered By | <img width=1000/> Triggers ⇒ | <img width=200/> Description  
 :------------ | :-------- | :----------
 :incoming_envelope: **topic:** `RobotController.{robot_id}.SetTask` <br> :gem: **schema:** [RobotTaskRequest] | :incoming_envelope: **topic:** `{request.reply_to}` <br> :gem: **schema:** [RobotTaskReply] | `Configure the current task to be executed.`
-:clock5: **interval:** `{RobotTask.rate}` | :incoming_envelope: **topic:** `RobotController.{robot_id}.Status` <br> :gem: **schema:** [RobotControllerProgress] | `Periodically publishes the progress of the current task being executed. The period is determined by the task sampling rate.`
+:clock5: **interval:** `{RobotTask.rate}` | :incoming_envelope: **topic:** `RobotController.{robot_id}.Progress` <br> :gem: **schema:** [RobotControllerProgress] | `Periodically publishes the progress of the current task being executed. The period is determined by the task sampling rate.`
 
 
 [RobotTaskRequest]: https://github.com/labviros/is-msgs/tree/master/docs#is.robot.RobotTaskRequest
