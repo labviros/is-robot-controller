@@ -103,7 +103,7 @@ void PoseEstimation::run(is::Message const& message) {
 
   on_new_measurement(message.topic());
 
-  is::info("event=PoseEstimation.NewPose topic={} x={} y={} phi={}", message.topic(), pose(0),
+  is::info("event=PoseEstimation.NewPose topic={} x={} y={} heading={}", message.topic(), pose(0),
            pose(1), 180 * pose(2) / 3.14);
 }
 

@@ -10,7 +10,8 @@ message ControllerParameters {
   int32 robot_id = 1;
   // Offset from the robot center in meters that is going to be used as the controlled point.
   float center_offset = 2;
-  // Robot max speed values in x and y axis respectively (vx, vy) [m/s, m/s].
+  /* Robot max speed values in x and y axis and linear and rotational respectively 
+    (vx, vy, linear, angular) [m/s, m/s, m/s, degrees/s]. */
   repeated float speed_limits = 3;
   // Controller gains for x and y speeds respectively [kx, ky].
   repeated float gains = 4;

@@ -7,8 +7,10 @@
         "robot_id": 0,
         "center_offset": 0.2,
         "speed_limits": [
-            0.450,
-            0.250
+            1.0,
+            1.0,
+            0.7,
+            45.0
         ],
         "gains": [
             0.4,

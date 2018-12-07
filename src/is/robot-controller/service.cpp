@@ -30,7 +30,8 @@ int main(int argc, char** argv) {
   auto subscription_manager =
       is::SubscriptionManager{subscription, options.robot_frame_id(), options.world_frame_id()};
   auto estimator = is::PoseEstimation{};
-  auto controller = is::InverseKinematicsController{options.parameters(), &estimator};
+  auto controller =
+      is::InverseKinematicsController{channel, subscription, options.parameters(), &estimator};
 
   service.delegate<is::robot::RobotTaskRequest, is::robot::RobotTaskReply>(
       fmt::format("RobotController.{}.SetTask", options.parameters().robot_id()),
@@ -47,6 +48,6 @@ int main(int argc, char** argv) {
       estimator.run(*maybe_message);
       service.serve(*maybe_message);
     }
-    next_control_deadline = controller.run(channel, subscription, maybe_message);
+    next_control_deadline = controller.run(maybe_message);
   }
 }

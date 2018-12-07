@@ -1,11 +1,10 @@
 
 #include "basic-move-task.hpp"
 #include <is/wire/core/logger.hpp>
+
 namespace is {
 
-BasicMoveTask::BasicMoveTask(is::robot::BasicMoveTask const& task) {
-  target = 0;
-
+BasicMoveTask::BasicMoveTask(is::robot::BasicMoveTask const& task) : target(0) {
   if (task.speeds_size() != 0 and task.speeds_size() != task.positions_size()) {
     throw std::runtime_error{
         fmt::format("Speeds and positions must have the same size. User passed: size(speeds)={} "
@@ -25,12 +24,11 @@ auto BasicMoveTask::done() const -> bool {
 }
 
 auto BasicMoveTask::completion() const -> double {
-  return target / static_cast<double>(positions.size());
+  return positions.size() != 0 ? target / static_cast<double>(positions.size()) : 1.0;
 }
 
 void BasicMoveTask::update(is::common::Pose const& pose) {
   if (!done()) {
-    is::info("event=BasicMoveTask.Next progress={}/{}", target, positions.size());
     if (target == positions.size() - 1) {
       if (error(pose) <= allowed_error) {
         ++target;
@@ -54,7 +52,7 @@ auto BasicMoveTask::error(is::common::Pose const& pose) const -> double {
 
 auto BasicMoveTask::target_pose() const -> is::common::Pose {
   auto pose = is::common::Pose{};
-  *pose.mutable_position() = positions.at(target);
+  if (target < positions.size()) *pose.mutable_position() = positions[target];
   return pose;
 }
 
