@@ -3,7 +3,7 @@ from conans import ConanFile, CMake, tools
 
 class IsRobotControllerServiceConan(ConanFile):
     name = "is-robot-controller"
-    version = "0.0.1"
+    version = "0.0.3"
     license = "MIT"
     url = "https://github.com/labviros/is-robot-controller"
     description = ""

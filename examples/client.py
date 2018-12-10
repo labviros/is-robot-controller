@@ -5,6 +5,8 @@ import socket
 from is_msgs.robot_pb2 import RobotTaskRequest, RobotTaskReply, RobotControllerProgress
 from is_msgs.common_pb2 import Position, Speed
 from is_wire.core import Channel, Message, Subscription
+import argparse
+import sys
 
 
 def lemniscate_of_bernoulli(shape,
@@ -50,26 +52,50 @@ def final_position(target, rate=10, allowed_error=0.1):
     return task
 
 
+def stop():
+    task = RobotTaskRequest()
+    task.basic_move_task.rate = 10.0
+    return task
+
+
 with open("../etc/conf/options.json") as f:
     options = json.load(f)
 
-task = lemniscate_of_bernoulli(shape=(2, 1), center=(0, 0), lap_time=20)
-#task = final_position(target=(0, 0))
+parser = argparse.ArgumentParser()
+parser.add_argument('type', type=str, choices=['eight', 'goto', 'stop'])
+parser.add_argument('-x', type=float, default=0)
+parser.add_argument('-y', type=float, default=0)
+parser.add_argument('--rate', type=float, default=10)
+args = parser.parse_args()
+
+if args.type == 'goto':
+    task = final_position(target=(args.x, args.y), rate=args.rate)
+elif args.type == 'eight':
+    task = lemniscate_of_bernoulli(
+        shape=(args.x, args.y), center=(0, 0), lap_time=25, rate=args.rate)
+else:
+    task = stop()
 
 channel = Channel(options["broker_uri"])
 subscription = Subscription(channel)
+
 prefix = "RobotController.{}".format(options["parameters"]["robot_id"])
+set_task_topic = "{}.SetTask".format(prefix)
+progress_topic = "{}.Progress".format(prefix)
 
 message = Message(content=task, reply_to=subscription)
-channel.publish(message, topic="{}.SetTask".format(prefix))
+channel.publish(message, topic=set_task_topic)
 reply = channel.consume(timeout=1.0)
 if not reply.status.ok():
     raise Exception(reply.status.why)
 print(reply.unpack(RobotTaskReply))
 
-progress_topic = "{}.Progress".format(prefix)
 subscription.subscribe(progress_topic)
 while True:
-    message = channel.consume()
-    if message.topic == progress_topic:
-        print(message.unpack(RobotControllerProgress))
+    try:
+        message = channel.consume()
+        if message.topic == progress_topic:
+            print(message.unpack(RobotControllerProgress))
+    except KeyboardInterrupt:
+        channel.publish(Message(content=stop()), topic=set_task_topic)
+        sys.exit()

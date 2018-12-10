@@ -71,7 +71,7 @@ auto InverseKinematicsController::compute_control_action() -> is::robot::RobotCo
   }
 
   *progress.mutable_current_pose() = current_pose;
-  *progress.mutable_desired_pose() = task->target_pose();
+  *progress.mutable_desired_pose() = desired_pose;
   progress.set_error(task->error(current_pose));
 
   task->update(current_pose);
@@ -132,7 +132,7 @@ void InverseKinematicsController::publish_task_progress(
   channel.publish(fmt::format("RobotController.{}.Progress", parameters.robot_id()),
                   is::Message{progress});
 
-  is::info("event=Controller.Progress id={} %={} v={} w={} x={} y={} heading={}", progress.id(),
+  is::info("event=Controller.Progress id={} %={} v={}m/s w={}°/s x={}m y={}m heading={}°", progress.id(),
            progress.completion() * 100, progress.current_speed().linear(),
            180 * progress.current_speed().angular() / 3.14, progress.current_pose().position().x(),
            progress.current_pose().position().y(),
