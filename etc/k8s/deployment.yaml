@@ -6,8 +6,8 @@ metadata:
 data:
   config: |-
     {
-      "broker_uri": "amqp://192.168.1.105:30000",
-      "zipkin_uri": "http://192.168.1.105:30200",
+      "broker_uri": "amqp://rabbitmq.default",
+      "zipkin_uri": "http://zipkin.default",
       "robot_frame_id": 100,
       "world_frame_id": 1000,
       "parameters": {
@@ -38,7 +38,7 @@ spec:
   template:
     metadata:
       labels:
-        app:is-robot-controller 
+        app: is-robot-controller 
     spec:
       containers:
       - name: service 
