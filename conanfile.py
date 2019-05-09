@@ -13,11 +13,15 @@ class IsRobotControllerServiceConan(ConanFile):
         "fPIC": [True, False],
         "build_tests": [True, False],
     }
-    default_options = "shared=False", "fPIC=True", "build_tests=False"
+    default_options = "shared=True", "fPIC=True", "build_tests=False"
     generators = "cmake", "cmake_find_package", "cmake_paths", "virtualrunenv"
     requires = (
+        # keep these three requirements in that order to
+        #  work on either static or shared compilation
+        "zipkin-cpp-opentracing/0.3.1@is/stable",
         "is-msgs/1.1.10@is/stable",
-        "is-wire/1.1.4@is/stable",
+        "is-wire/1.1.5@is/stable",
+        #
         "eigen/3.3.5@conan/stable",
     )
 
@@ -28,16 +32,8 @@ class IsRobotControllerServiceConan(ConanFile):
             self.build_requires("gtest/1.8.0@bincrafters/stable")
 
     def configure(self):
-        self.options["is-msgs"].shared = False
-        self.options["is-wire"].shared = False
-        self.options["boost"].shared = False
-        self.options["protobuf"].shared = False
-        self.options["SimpleAmqpClient"].shared = False
-        self.options["rabbitmq-c"].shared = False
-        self.options["opentracing-cpp"].shared = False
-        self.options["prometheus-cpp"].shared = False
-        self.options["fmt"].shared = False
-        self.options["zlib"].shared = False
+        self.options["is-msgs"].shared = self.options.shared
+        self.options["is-wire"].shared = self.options.shared
 
     def build(self):
         cmake = CMake(self, generator='Ninja')
