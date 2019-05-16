@@ -23,6 +23,11 @@ auto PoseEstimation::pose() -> is::common::Pose {
   return pose;
 }
 
+auto PoseEstimation::last_context(std::shared_ptr<opentracing::Tracer> const& tracer)
+    -> opentracing::expected<std::unique_ptr<opentracing::SpanContext>> {
+  return last_message.extract_tracing(tracer);
+}
+
 PoseEstimation::PoseEstimation() : speed(Eigen::VectorXd::Zero(2)) {
   kf.mean_post = Eigen::VectorXd::Zero(3);
   kf.covariance_post = Eigen::MatrixXd::Identity(3, 3);
@@ -75,6 +80,7 @@ void PoseEstimation::run(is::Message const& message) {
   using namespace std::chrono;
   if (message.topic().find("FrameTransformation") != 0) { return; }
 
+  last_message = message;
   auto frame_transformation = message.unpack<is::vision::FrameTransformation>();
   if (!frame_transformation || !frame_transformation->has_tf()) { return; }
 

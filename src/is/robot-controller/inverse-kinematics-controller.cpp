@@ -7,12 +7,13 @@
 
 namespace is {
 
-InverseKinematicsController::InverseKinematicsController(is::Channel const& channel,
-                                                         is::Subscription const& subscription,
-                                                         is::ControllerParameters const& params,
-                                                         is::PoseEstimation* est)
+InverseKinematicsController::InverseKinematicsController(
+    is::Channel const& channel, is::Subscription const& subscription,
+    std::shared_ptr<opentracing::Tracer> const& tracer, is::ControllerParameters const& params,
+    is::PoseEstimation* est)
     : channel(channel),
       subscription(subscription),
+      tracer(tracer),
       parameters(params),
       estimator(est),
       next_deadline(std::chrono::system_clock::now()),
@@ -67,7 +68,7 @@ auto InverseKinematicsController::compute_control_action() -> is::robot::RobotCo
     progress.mutable_current_speed()->set_angular(limited_action(1));
   } else {
     progress.mutable_current_speed()->set_linear(0);
-    progress.mutable_current_speed()->set_linear(0);
+    progress.mutable_current_speed()->set_angular(0);
   }
 
   *progress.mutable_current_pose() = current_pose;
@@ -104,11 +105,14 @@ auto InverseKinematicsController::run(boost::optional<is::Message> const& messag
   }
 
   if (std::chrono::system_clock::now() >= next_deadline) {
+    auto maybe_ctx = estimator->last_context(tracer);
+    auto span = maybe_ctx ? tracer->StartSpan("ControlAction", {ChildOf(maybe_ctx->get())})
+                          : tracer->StartSpan("ControlAction");
     next_deadline += std::chrono::microseconds(static_cast<int>(1e6 / task->rate()));
     warn_robot_communication();
 
     auto progress = compute_control_action();
-    publish_robot_speed(progress.current_speed());
+    publish_robot_speed(progress.current_speed(), span);
     publish_task_progress(progress);
   }
   return next_deadline;
@@ -132,19 +136,22 @@ void InverseKinematicsController::publish_task_progress(
   channel.publish(fmt::format("RobotController.{}.Progress", parameters.robot_id()),
                   is::Message{progress});
 
-  is::info("event=Controller.Progress id={} %={} v={}m/s w={}°/s x={}m y={}m heading={}°", progress.id(),
-           progress.completion() * 100, progress.current_speed().linear(),
+  is::info("event=Controller.Progress id={} %={} v={}m/s w={}°/s x={}m y={}m heading={}°",
+           progress.id(), progress.completion() * 100, progress.current_speed().linear(),
            180 * progress.current_speed().angular() / 3.14, progress.current_pose().position().x(),
            progress.current_pose().position().y(),
            180 * progress.current_pose().orientation().roll() / 3.14);
 }
 
-void InverseKinematicsController::publish_robot_speed(is::common::Speed const& speed) {
+void InverseKinematicsController::publish_robot_speed(is::common::Speed const& speed,
+                                                      std::unique_ptr<opentracing::Span> const& span) {
   auto config = is::robot::RobotConfig{};
   *config.mutable_speed() = speed;
   auto config_message = is::Message{config};
   config_message.set_reply_to(subscription);
+  config_message.inject_tracing(tracer, span->context());
   channel.publish(fmt::format("RobotGateway.{}.SetConfig", parameters.robot_id()), config_message);
+  span->Finish();
 
   last_speed = speed;
   last_cid = config_message.correlation_id();

@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.10.0)
 
 find_package(is-wire REQUIRED)
 find_package(is-msgs REQUIRED)
+find_package(zipkin-cpp-opentracing REQUIRED)
 find_package(boost REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
@@ -32,6 +33,7 @@ target_link_libraries(
  PUBLIC
   is-msgs::is-msgs
   is-wire::is-wire
+  zipkin-cpp-opentracing::zipkin-cpp-opentracing
   boost::boost
   Eigen3::Eigen
 )

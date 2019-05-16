@@ -3,6 +3,7 @@
 
 #include <is/msgs/common.pb.h>
 #include <is/msgs/robot.pb.h>
+#include <zipkin/opentracing.h>
 #include "basic-move-task.hpp"
 #include "conf/options.pb.h"
 #include "control-task.hpp"
@@ -17,6 +18,7 @@ namespace is {
 class InverseKinematicsController {
   Channel channel;
   Subscription subscription;
+  std::shared_ptr<opentracing::Tracer> tracer;
   ControllerParameters parameters;
   PoseEstimation* estimator;
   std::unique_ptr<ControlTask> task;
@@ -28,11 +30,13 @@ class InverseKinematicsController {
 
  private:
   void warn_robot_communication() const;
-  void publish_robot_speed(is::common::Speed const& speed);
+  void publish_robot_speed(is::common::Speed const& speed,
+                           std::unique_ptr<opentracing::Span> const& span);
   void publish_task_progress(is::robot::RobotControllerProgress progress);
 
  public:
   InverseKinematicsController(is::Channel const& channel, is::Subscription const& subscription,
+                              std::shared_ptr<opentracing::Tracer> const& tracer,
                               is::ControllerParameters const&, is::PoseEstimation*);
 
   auto compute_control_action() -> is::robot::RobotControllerProgress;

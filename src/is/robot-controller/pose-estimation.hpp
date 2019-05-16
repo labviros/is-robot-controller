@@ -16,12 +16,16 @@ class PoseEstimation {
   std::chrono::system_clock::time_point last_observation;
   std::chrono::microseconds time_since_observation;
   Eigen::VectorXd speed;
+  is::Message last_message;
 
  public:
   PoseEstimation();
 
   // Returns an estimate of the pose at the current moment.
   auto pose() -> is::common::Pose;
+  // Returns context of last observation received
+  auto last_context(std::shared_ptr<opentracing::Tracer> const& tracer)
+      -> opentracing::expected<std::unique_ptr<opentracing::SpanContext>>;
   // Configure the current robot speed. This is used to estimate the pose.
   void set_speed(is::common::Speed const&);
   auto time_since_last_observation() const -> std::chrono::microseconds;
