@@ -1,11 +1,11 @@
-# Controlling MobyLisa
+# Controlling MobiLysa
 
-![alt text](images/mobylisa.png "Mobylisa's controlling diagram")
+![alt text](images/mobilysa.png "MobiLysa's controlling diagram")
 
 - An **ArUco** marker is located on the ground, visible by at least one of the cameras. This marker locates the robot station, labeled as `robot_station_id`.
-- MobyLisa **must** be place aligned with `robot_station_id<101>` before any interaction and controlling task.
+- MobiLysa **must** be place aligned with `robot_station_id<101>` before any interaction and controlling task.
   - Alignment error can be estimated using **is-frame-transformation** service, retrieving transformation between `<100>` and `<101>`.
-- MobyLisa's gateway:
+- MobiLysa's gateway:
   - Has a coordinate referential frame aligned with its pose's center (`robot_center_id<robot_id+2000=2000>`).
   - On its configuration, contains the `x`, `y` and `z` displacement between `robot_center_id<2000>` and the marker (*ArUco*) attached with it, `robot_marker_id<100>`.
   - Has a service for registration (`RobotGateway.{robot_id<0>}.Register`). The service's topic receives a message with a `robot_station_id<101>`, and then:
