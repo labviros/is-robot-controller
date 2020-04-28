@@ -1,6 +1,6 @@
 # Controlling MobiLysa
 
-![alt text](images/mobilysa.png "MobiLysa's controlling diagram")
+![alt text](/docs/images/mobilysa.png?raw=true "MobiLysa's controlling diagram")
 
 - An **ArUco** marker is located on the ground, visible by at least one of the cameras. This marker locates the robot station, labeled as `robot_station_id`.
 - MobiLysa **must** be place aligned with `robot_station_id<101>` before any interaction and controlling task.
